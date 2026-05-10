@@ -7,12 +7,13 @@ and provides authenticated fetch wrappers for all TradingView APIs.
 """
 
 import json
+import time
 from pathlib import Path
 
 import httpx
 import websockets
 
-from .browser import get_ws_endpoint, get_status
+from .browser import get_ws_endpoint, inject_cookies
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -21,9 +22,48 @@ USER_AGENT = (
 
 _cookie_cache: str | None = None
 
+# Persistent cookie cache in plugin data directory
+COOKIE_CACHE_FILE = (
+    Path.home() / ".claude" / "plugins" / "data"
+    / ".chrome-profiles" / "tradingview" / ".tv_session.json"
+)
+
+
+def save_cookies_to_disk(cookies: list[dict], user: dict | None = None) -> None:
+    """Persist login cookies to disk for reuse across sessions."""
+    COOKIE_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "cookies": cookies,
+        "user": user or {},
+        "saved_at": time.time(),
+    }
+    COOKIE_CACHE_FILE.write_text(json.dumps(payload))
+
+
+def load_cookies_from_disk() -> dict | None:
+    """Load cached cookies from disk. Returns None if missing/corrupt."""
+    if not COOKIE_CACHE_FILE.exists():
+        return None
+    try:
+        data = json.loads(COOKIE_CACHE_FILE.read_text())
+        if data.get("cookies"):
+            return data
+    except (json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
+def clear_cookies_from_disk() -> None:
+    """Remove persisted cookie cache."""
+    COOKIE_CACHE_FILE.unlink(missing_ok=True)
+
 
 async def harvest_cookies() -> str:
-    """Harvest TradingView cookies from browser via CDP Storage.getCookies."""
+    """Harvest TradingView cookies from browser via CDP Storage.getCookies.
+
+    If the browser has no TradingView cookies but a disk cache exists,
+    automatically re-injects the cached cookies into the browser.
+    """
     global _cookie_cache
     if _cookie_cache:
         return _cookie_cache
@@ -45,13 +85,43 @@ async def harvest_cookies() -> str:
             c for c in cookies
             if ".tradingview.com" in c.get("domain", "") or "tradingview.com" in c.get("domain", "")
         ]
-        cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in tv_cookies)
-        _cookie_cache = cookie_str
-        return cookie_str
+
+    # If browser has no session cookie, try restoring from disk cache
+    has_session = any(c.get("name") == "sessionid" for c in tv_cookies)
+    if not has_session:
+        cached = load_cookies_from_disk()
+        if cached:
+            result = await inject_cookies(cached["cookies"])
+            if result.get("ok"):
+                # Re-harvest after injection
+                async with websockets.connect(ws_url, max_size=10 * 1024 * 1024) as ws:
+                    await ws.send(json.dumps({"id": 1, "method": "Storage.getCookies", "params": {}}))
+                    resp = json.loads(await ws.recv())
+                    cookies = resp.get("result", {}).get("cookies", [])
+                    tv_cookies = [
+                        c for c in cookies
+                        if ".tradingview.com" in c.get("domain", "") or "tradingview.com" in c.get("domain", "")
+                    ]
+
+    cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in tv_cookies)
+    _cookie_cache = cookie_str
+
+    # Auto-persist session cookies to disk whenever we harvest a valid session
+    has_session = any(c.get("name") == "sessionid" for c in tv_cookies)
+    if has_session:
+        disk_cookies = [
+            {"name": c["name"], "value": c["value"], "domain": c.get("domain", ".tradingview.com"), "path": c.get("path", "/")}
+            for c in tv_cookies
+            if c.get("name") in ("sessionid", "sessionid_sign", "device_t")
+        ]
+        if disk_cookies:
+            save_cookies_to_disk(disk_cookies)
+
+    return cookie_str
 
 
 def reset_cookie_cache():
-    """Reset cached cookies."""
+    """Reset in-memory cached cookies (does not touch disk cache)."""
     global _cookie_cache
     _cookie_cache = None
 

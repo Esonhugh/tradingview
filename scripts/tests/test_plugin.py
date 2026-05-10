@@ -200,9 +200,9 @@ def test_cli_help_command():
     """help command returns list of all commands."""
     result = asyncio.run(_run_cmd("help", {}))
     assert "commands" in result
-    expected = ["launch", "login", "login-email", "stop", "ensure", "status", "quote",
-                "options-chain", "options-expiries", "screener", "search",
-                "news", "watchlists", "alerts", "chart-state", "screenshot"]
+    expected = ["launch", "login-interactive", "login-email", "stop", "ensure",
+                "status", "quote", "options-chain", "options-expiries", "screener",
+                "search", "news", "watchlists", "alerts", "chart-state", "screenshot"]
     for cmd in expected:
         assert cmd in result["commands"], f"Missing command: {cmd}"
     print("  PASS  test_cli_help_command")
@@ -285,7 +285,7 @@ def test_plugin_structure():
         ".claude-plugin/plugin.json",
         "monitors/monitors.json",
         "commands/launch.md",
-        "commands/login.md",
+        "commands/login-interactive.md",
         "commands/login-email.md",
         "commands/stop.md",
         "commands/status.md",

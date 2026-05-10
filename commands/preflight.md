@@ -38,4 +38,4 @@ fi
 If any check fails, inform the user:
 - **uv missing**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - **deps missing**: `cd <plugin>/scripts && uv sync`
-- **no profile**: Run `/tradingview:login` for first-time login
+- **no profile**: Run `/tradingview:login-email` (or `/tradingview:login-interactive` for 2FA accounts) for first-time login

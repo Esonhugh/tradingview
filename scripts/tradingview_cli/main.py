@@ -57,7 +57,9 @@ async def run(cmd: str, args: dict) -> dict:
         launch_browser, stop_browser, get_status, ensure_running, list_pages,
         inject_cookies, DEFAULT_CDP_PORT,
     )
-    from tradingview_cli.client import programmatic_login, reset_cookie_cache
+    from tradingview_cli.client import (
+        programmatic_login, reset_cookie_cache, save_cookies_to_disk,
+    )
     from tradingview_cli.commands import (
         cmd_quote, cmd_options_chain, cmd_options_expiries,
         cmd_screener, cmd_search, cmd_news, cmd_watchlists,
@@ -70,7 +72,7 @@ async def run(cmd: str, args: dict) -> dict:
     if cmd == "launch":
         return await launch_browser(port=port, headless=headless)
 
-    elif cmd == "login":
+    elif cmd == "login-interactive":
         # Always stop existing instance, then launch visible for login
         stop_browser()
         result = await launch_browser(port=port, headless=False)
@@ -109,10 +111,13 @@ async def run(cmd: str, args: dict) -> dict:
         if "error" in inject_result:
             return inject_result
 
-        # Step 3: Clear cookie cache so next harvest picks up injected cookies
+        # Step 3: Persist cookies to disk for cross-session reuse
+        save_cookies_to_disk(login_result["cookies"], login_result.get("user"))
+
+        # Step 4: Clear in-memory cache so next harvest picks up injected cookies
         reset_cookie_cache()
 
-        # Step 4: Verify session works
+        # Step 5: Verify session works
         try:
             verify = await cmd_watchlists()
             if isinstance(verify, dict) and "_error" in verify:
@@ -218,9 +223,9 @@ async def run(cmd: str, args: dict) -> dict:
 
     elif cmd == "help":
         return {"commands": [
-            "launch", "login", "login-email", "stop", "ensure", "status", "quote",
-            "options-chain", "options-expiries", "screener", "search", "news",
-            "watchlists", "alerts", "chart-state", "screenshot",
+            "launch", "login-interactive", "login-email", "stop", "ensure",
+            "status", "quote", "options-chain", "options-expiries", "screener",
+            "search", "news", "watchlists", "alerts", "chart-state", "screenshot",
         ]}
 
     else:
