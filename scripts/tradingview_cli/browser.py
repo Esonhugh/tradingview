@@ -180,6 +180,18 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
             except Exception:
                 continue
 
+        # Write state so stop_browser() can find the Chrome PID
+        state = {
+            "status": "running",
+            "chrome_pid": proc.pid,
+            "monitor_pid": None,
+            "port": port,
+            "headless": False,
+            "profile_dir": str(PROFILE_DIR),
+            "started_at": time.time(),
+        }
+        STATE_FILE.write_text(json.dumps(state))
+
         return {
             "status": "launched",
             "port": port,
@@ -192,6 +204,8 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
 def stop_browser() -> dict:
     """Stop the monitor daemon (which stops Chrome), or stop a visible Chrome."""
     state = _read_state()
+    chrome_pid = state.get("chrome_pid") if state else None
+    monitor_pid = None
 
     if state and _monitor_alive(state):
         monitor_pid = state["monitor_pid"]
@@ -210,10 +224,26 @@ def stop_browser() -> dict:
                     pass
         except OSError:
             pass
-        STATE_FILE.unlink(missing_ok=True)
-        return {"status": "stopped", "monitor_pid": monitor_pid, "pid": state.get("chrome_pid")}
 
-    # No monitor — kill Chrome using our profile directly
+    # Ensure Chrome process is dead (handles orphaned Chrome after monitor exit)
+    if chrome_pid:
+        try:
+            os.kill(chrome_pid, signal.SIGTERM)
+            for _ in range(12):
+                time.sleep(0.25)
+                try:
+                    os.kill(chrome_pid, 0)
+                except OSError:
+                    break
+            else:
+                try:
+                    os.kill(chrome_pid, signal.SIGKILL)
+                except OSError:
+                    pass
+        except OSError:
+            pass
+
+    # Fallback: pkill any Chrome using our profile (catches PID-unknown cases)
     try:
         subprocess.run(
             ["pkill", "-f", f"--user-data-dir={PROFILE_DIR}"],
@@ -221,8 +251,12 @@ def stop_browser() -> dict:
         )
     except Exception:
         pass
+
+    # Wait briefly for port to be freed
+    time.sleep(0.3)
+
     STATE_FILE.unlink(missing_ok=True)
-    return {"status": "stopped"}
+    return {"status": "stopped", "monitor_pid": monitor_pid, "pid": chrome_pid}
 
 
 async def ensure_running(port: int = DEFAULT_CDP_PORT, headless: bool = True) -> dict:

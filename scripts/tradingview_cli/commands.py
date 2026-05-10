@@ -298,14 +298,18 @@ async def cmd_news(story_id: str | None = None, symbol: str | None = None,
 
 async def cmd_watchlists(list_id: str | None = None, color: str | None = None) -> dict:
     """Fetch watchlists (all, by id, or by color flag)."""
+    base = "https://www.tradingview.com/api/v1/symbols_list"
     if color:
-        url = f"https://www.tradingview.com/api/v1/symbols_list/colorsflag:{color}/"
+        url = f"{base}/colored/?source=web"
         return {"color": color, "data": await tv_fetch(url)}
     if list_id:
-        url = f"https://www.tradingview.com/api/v1/symbols_list/{list_id}/"
+        url = f"{base}/custom/{list_id}?source=web"
         return {"id": list_id, "data": await tv_fetch(url)}
-    url = "https://www.tradingview.com/api/v1/symbols_list/"
-    return {"data": await tv_fetch(url)}
+    # Fetch all categories
+    custom = await tv_fetch(f"{base}/custom/?source=web")
+    active = await tv_fetch(f"{base}/active/?source=web")
+    colored = await tv_fetch(f"{base}/colored/?source=web")
+    return {"custom": custom, "active": active, "colored": colored}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
