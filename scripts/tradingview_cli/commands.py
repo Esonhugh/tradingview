@@ -261,12 +261,14 @@ async def cmd_news(story_id: str | None = None, symbol: str | None = None,
                    lang: str = "en", limit: int = 20) -> dict:
     """Fetch news headlines or a specific story."""
     if story_id:
-        url = f"https://news-headlines.tradingview.com/v2/story?id={story_id}"
+        url = f"https://news-mediator.tradingview.com/public/news/v1/story?id={story_id}&lang={lang}&user_prostatus=non_pro"
         data = await tv_fetch(url)
         if "_error" in data:
             return data
-        story = data.get("story", data)
-        if isinstance(story, dict) and "astDescription" in story:
+        story = data
+        if isinstance(story, dict) and "ast_description" in story:
+            story["text"] = _ast_to_text(story["ast_description"])
+        elif isinstance(story, dict) and "astDescription" in story:
             story["text"] = _ast_to_text(story["astDescription"])
         return story
 
