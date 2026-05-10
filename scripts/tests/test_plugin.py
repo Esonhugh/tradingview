@@ -200,7 +200,7 @@ def test_cli_help_command():
     """help command returns list of all commands."""
     result = asyncio.run(_run_cmd("help", {}))
     assert "commands" in result
-    expected = ["launch", "login", "stop", "ensure", "status", "quote",
+    expected = ["launch", "login", "login-email", "stop", "ensure", "status", "quote",
                 "options-chain", "options-expiries", "screener", "search",
                 "news", "watchlists", "alerts", "chart-state", "screenshot"]
     for cmd in expected:
@@ -224,6 +224,12 @@ def test_cli_missing_args():
     assert "error" in result
 
     result = asyncio.run(_run_cmd("options-chain", {}))
+    assert "error" in result
+
+    result = asyncio.run(_run_cmd("login-email", {}))
+    assert "error" in result
+
+    result = asyncio.run(_run_cmd("login-email", {"email": "test@example.com"}))
     assert "error" in result
 
     print("  PASS  test_cli_missing_args")
@@ -280,6 +286,7 @@ def test_plugin_structure():
         "monitors/monitors.json",
         "commands/launch.md",
         "commands/login.md",
+        "commands/login-email.md",
         "commands/stop.md",
         "commands/status.md",
         "commands/preflight.md",

@@ -268,6 +268,67 @@ async def ensure_running(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
     return await launch_browser(port=port, headless=headless)
 
 
+async def inject_cookies(cookies: list[dict]) -> dict:
+    """Inject cookies into running Chrome via CDP Network.setCookies.
+
+    Connects to a page-level CDP target (not the browser endpoint) because
+    Network.setCookies is only available on page targets.
+    """
+    import websockets
+
+    status = get_status()
+    if not status["running"]:
+        result = await ensure_running()
+        if "error" in result:
+            return result
+        status = get_status()
+
+    port = status["port"]
+
+    # Get a page-level WebSocket target (Network domain is page-level only)
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"http://127.0.0.1:{port}/json")
+            targets = resp.json()
+        page = next((t for t in targets if t.get("type") == "page"), None)
+        if not page:
+            return {"error": "No page target found in browser"}
+        ws_url = page["webSocketDebuggerUrl"]
+    except Exception as e:
+        return {"error": f"Cannot get CDP page target: {e}"}
+
+    try:
+        async with websockets.connect(ws_url, max_size=5 * 1024 * 1024) as ws:
+            # Enable Network domain first
+            await ws.send(json.dumps({"id": 1, "method": "Network.enable", "params": {}}))
+            await ws.recv()
+
+            # Inject cookies
+            msg = json.dumps({
+                "id": 2,
+                "method": "Network.setCookies",
+                "params": {"cookies": cookies},
+            })
+            await ws.send(msg)
+            resp_data = json.loads(await ws.recv())
+
+            if "error" in resp_data:
+                return {"error": f"CDP setCookies failed: {resp_data['error']}"}
+
+            # Navigate to TradingView to activate the session
+            await ws.send(json.dumps({
+                "id": 3,
+                "method": "Page.navigate",
+                "params": {"url": "https://www.tradingview.com/"},
+            }))
+            await ws.recv()
+
+        return {"ok": True, "injected": len(cookies)}
+
+    except Exception as e:
+        return {"error": f"Cookie injection failed: {e}"}
+
+
 async def list_pages() -> list:
     """List open browser pages via CDP."""
     status = get_status()

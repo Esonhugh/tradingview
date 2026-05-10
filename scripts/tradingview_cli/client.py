@@ -90,6 +90,60 @@ async def tv_fetch(url: str, method: str = "GET", json_body: dict | None = None,
             return {"_error": resp.status_code, "_body": resp.text[:500]}
 
 
+async def programmatic_login(email: str, password: str) -> dict:
+    """Login to TradingView via email/password, return cookies for injection.
+
+    POSTs form-encoded credentials to /accounts/signin/ and collects
+    the session cookies (sessionid, device_t, etc.) from the response.
+    """
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Origin": "https://www.tradingview.com",
+                "Referer": "https://www.tradingview.com/",
+            },
+            timeout=30.0,
+        ) as client:
+            resp = await client.post(
+                "https://www.tradingview.com/accounts/signin/",
+                data={"username": email, "password": password, "remember": "on"},
+            )
+
+            if resp.status_code != 200:
+                return {"error": f"Login failed: HTTP {resp.status_code}"}
+
+            try:
+                data = resp.json()
+            except (json.JSONDecodeError, ValueError):
+                return {"error": "Login failed: unexpected response format"}
+
+            if data.get("error"):
+                msg = data["error"]
+                if "two" in str(msg).lower() or "2fa" in str(msg).lower():
+                    return {"error": f"2FA required: {msg}. Use the interactive 'login' command instead."}
+                return {"error": f"Login failed: {msg}"}
+
+            # Collect all cookies from the client jar
+            cookies = []
+            for name, value in client.cookies.items():
+                cookies.append({
+                    "name": name,
+                    "value": value,
+                    "domain": ".tradingview.com",
+                    "path": "/",
+                })
+            return {"ok": True, "cookies": cookies, "user": data.get("user", {})}
+
+    except httpx.TimeoutException:
+        return {"error": "Login request timed out"}
+    except httpx.ConnectError:
+        return {"error": "Could not connect to TradingView"}
+    except Exception as e:
+        return {"error": f"Login failed: {type(e).__name__}: {e}"}
+
+
 async def tv_scan(market: str, body: dict) -> dict:
     """POST to scanner.tradingview.com/{market}/scan2."""
     url = f"https://scanner.tradingview.com/{market}/scan2"

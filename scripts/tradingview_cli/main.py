@@ -9,6 +9,7 @@ Commands:
     launch          Launch/ensure Chrome browser with persistent profile
     stop            Stop the running browser
     status          Check browser CDP connection status
+    login-email     Non-interactive login with email/password
     quote           Get spot quote for a symbol
     options-chain   Fetch options chain
     options-expiries List available expiration dates
@@ -54,8 +55,9 @@ async def run(cmd: str, args: dict) -> dict:
     """Dispatch command to appropriate handler."""
     from tradingview_cli.browser import (
         launch_browser, stop_browser, get_status, ensure_running, list_pages,
-        DEFAULT_CDP_PORT,
+        inject_cookies, DEFAULT_CDP_PORT,
     )
+    from tradingview_cli.client import programmatic_login, reset_cookie_cache
     from tradingview_cli.commands import (
         cmd_quote, cmd_options_chain, cmd_options_expiries,
         cmd_screener, cmd_search, cmd_news, cmd_watchlists,
@@ -90,6 +92,44 @@ async def run(cmd: str, args: dict) -> dict:
         result["mode"] = "visible"
         result["message"] = "Browser opened at TradingView sign-in page. Please log in, then confirm here."
         return result
+
+    elif cmd == "login-email":
+        email = args.get("email")
+        password = args.get("password")
+        if not email or not password:
+            return {"error": "Missing --email and/or --password arguments"}
+
+        # Step 1: Programmatic login via HTTP
+        login_result = await programmatic_login(email, password)
+        if "error" in login_result:
+            return login_result
+
+        # Step 2: Ensure browser is running, then inject cookies
+        inject_result = await inject_cookies(login_result["cookies"])
+        if "error" in inject_result:
+            return inject_result
+
+        # Step 3: Clear cookie cache so next harvest picks up injected cookies
+        reset_cookie_cache()
+
+        # Step 4: Verify session works
+        try:
+            verify = await cmd_watchlists()
+            if isinstance(verify, dict) and "_error" in verify:
+                return {
+                    "status": "login_ok_but_verify_failed",
+                    "injected": inject_result["injected"],
+                    "user": login_result.get("user", {}),
+                    "verify_error": verify.get("_message", str(verify)),
+                }
+        except Exception:
+            pass  # Non-fatal: login succeeded even if verify fails
+
+        return {
+            "status": "logged_in",
+            "injected": inject_result["injected"],
+            "user": login_result.get("user", {}),
+        }
 
     elif cmd == "ensure":
         return await ensure_running(port=port, headless=headless)
@@ -178,9 +218,9 @@ async def run(cmd: str, args: dict) -> dict:
 
     elif cmd == "help":
         return {"commands": [
-            "launch", "login", "stop", "ensure", "status", "quote", "options-chain",
-            "options-expiries", "screener", "search", "news", "watchlists",
-            "alerts", "chart-state", "screenshot",
+            "launch", "login", "login-email", "stop", "ensure", "status", "quote",
+            "options-chain", "options-expiries", "screener", "search", "news",
+            "watchlists", "alerts", "chart-state", "screenshot",
         ]}
 
     else:
