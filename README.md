@@ -4,8 +4,9 @@ Read-only TradingView data access via persistent headless Chrome with automatic 
 
 ## Features
 
-- **13 slash commands** covering quotes, options, screener, news, watchlists, alerts, chart state, and screenshots
+- **15 slash commands** covering quotes, options, screener, news, watchlists, alerts, chart state, and screenshots
 - **Persistent Chrome profile** at `~/.claude/plugins/data/.chrome-profiles/tradingview` — login once, access forever
+- **Cross-session cookie persistence** — session cookies are saved to disk and auto-restored when the browser restarts, no re-login needed
 - **Plugin monitor** — Chrome auto-launches, health-checks every 10s, auto-restarts on crash, port conflict resolution
 - **3 analysis skills** for guided screener, options, and news workflows
 
@@ -26,14 +27,16 @@ Read-only TradingView data access via persistent headless Chrome with automatic 
 cd <plugin-root>/scripts
 uv sync
 
-# 2. First-time: launch with visible browser for login
-/tradingview:login
+# 2. First-time login (non-interactive, no browser window needed)
+/tradingview:login-email --email=you@example.com --password=yourpassword
 
-# 3. Log into TradingView in the browser window
-#    Session persists in ~/.claude/plugins/data/.chrome-profiles/tradingview
+# 3. Session cookies are persisted to disk automatically
+#    They survive browser restarts and new Claude sessions
 
 # 4. Done! The plugin monitor auto-launches headless Chrome on every session
 ```
+
+For accounts with 2FA enabled, use `/tradingview:login-interactive` instead (opens a visible browser window).
 
 ## Commands
 
@@ -41,7 +44,8 @@ uv sync
 |---------|-------------|
 | `/tradingview:preflight` | Verify prerequisites (uv, deps, profile) |
 | `/tradingview:launch` | Launch Chrome with persistent profile |
-| `/tradingview:login` | Open visible browser for login |
+| `/tradingview:login-email` | Non-interactive email/password login |
+| `/tradingview:login-interactive` | Open visible browser for manual/2FA login |
 | `/tradingview:stop` | Stop the browser and monitor |
 | `/tradingview:status` | Check connection status and open tabs |
 | `/tradingview:quote <ticker>` | Get real-time spot quote |
@@ -63,6 +67,17 @@ uv sync
 | `options-analysis` | "analyze options", "best expiry", "iron condor", "vertical spread" |
 | `news-research` | "AAPL news", "why did X move", "market headlines", "sentiment" |
 
+## Authentication
+
+The plugin supports two login methods:
+
+| Method | Command | When to Use |
+|--------|---------|-------------|
+| **Email/password** | `/tradingview:login-email` | Default. Works headlessly, no browser window |
+| **Interactive** | `/tradingview:login-interactive` | Accounts with 2FA, or when email login fails |
+
+Session cookies are automatically persisted to `~/.claude/plugins/data/.chrome-profiles/tradingview/.tv_session.json`. When a new browser session starts without cookies, they are auto-restored from disk — no re-login required across Claude sessions or browser restarts.
+
 ## Plugin Monitor (Auto-Launch)
 
 The plugin uses Claude Code's native `monitors` component to automatically manage Chrome:
@@ -82,7 +97,7 @@ After first-time login setup, all data commands work seamlessly without manual b
 ```
 tradingview/
 ├── .claude-plugin/plugin.json  # Plugin manifest (v0.2.0)
-├── commands/                   # 14 slash commands
+├── commands/                   # 16 slash commands
 ├── skills/                     # 3 analysis workflow skills
 ├── monitors/                   # Plugin monitor (auto-manages Chrome)
 │   └── monitors.json
@@ -91,8 +106,8 @@ tradingview/
     ├── tradingview.py          # CLI: uv run ./tradingview.py <cmd>
     └── tradingview_cli/        # Python package
         ├── monitor.py          # Monitor daemon (health check, auto-restart)
-        ├── browser.py          # Chrome lifecycle (reads monitor state)
-        ├── client.py           # Cookie harvester + authenticated HTTP
+        ├── browser.py          # Chrome lifecycle + cookie injection via CDP
+        ├── client.py           # Cookie harvester + auto-restore + authenticated HTTP
         ├── commands.py         # Command implementations
         └── main.py             # CLI dispatcher
 ```
@@ -101,9 +116,10 @@ tradingview/
 
 1. **Monitor-based lifecycle**: Plugin monitor daemon manages Chrome with health checks and auto-restart, replacing manual launch/hook patterns
 2. **Persistent Chrome profile**: Login once at `~/.claude/plugins/data/.chrome-profiles/tradingview`, access persists across all sessions
-3. **CDP health check**: Uses HTTP GET to `/json/version` instead of PID checks (Chrome headless spawns child processes)
-4. **Read-only by design**: No trade execution, alert creation, or watchlist modification
-5. **uv project**: Fast, reproducible dependency management
+3. **Disk-backed cookie cache**: Session cookies saved to `.tv_session.json` and auto-restored into Chrome on new sessions — survives browser restarts without re-login
+4. **CDP health check**: Uses HTTP GET to `/json/version` instead of PID checks (Chrome headless spawns child processes)
+5. **Read-only by design**: No trade execution, alert creation, or watchlist modification
+6. **uv project**: Fast, reproducible dependency management
 
 ## Environment Variables
 

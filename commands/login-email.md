@@ -10,7 +10,7 @@ Login to TradingView using email and password without opening a visible browser.
 
 - Headless/CLI environments where a visible browser is unavailable
 - Automated setup without manual interaction
-- When the interactive `login` command is not practical
+- When the interactive `login-interactive` command is not practical
 
 ## Usage
 
@@ -20,16 +20,16 @@ cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py login-email --email=
 
 ## How It Works
 
-1. Makes an HTTP request to TradingView to get a CSRF token
-2. POSTs email + password to `/accounts/signin/`
-3. Injects the resulting session cookies into the headless Chrome profile via CDP
+1. POSTs email + password to TradingView's `/accounts/signin/` endpoint
+2. Injects the resulting session cookies into the headless Chrome profile via CDP
+3. Saves cookies to disk for auto-restore across sessions
 4. Verifies the session works by fetching watchlists
 
 ## Limitations
 
-- Does **not** support accounts with 2FA enabled — use the interactive `login` command for those
+- Does **not** support accounts with 2FA enabled — use `/tradingview:login-interactive` for those
 - Requires a working network connection to tradingview.com
 
 ## After Login
 
-The session persists in the Chrome profile. All other commands (`watchlists`, `quote`, `alerts`, etc.) work immediately.
+The session persists in the Chrome profile. Session cookies are also saved to disk (`~/.claude/plugins/data/.chrome-profiles/tradingview/.tv_session.json`) and auto-restored on future browser restarts. All other commands (`watchlists`, `quote`, `alerts`, etc.) work immediately.
