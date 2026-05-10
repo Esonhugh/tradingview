@@ -1,0 +1,7 @@
+[
+  {
+    "name": "tradingview-browser",
+    "command": "cd \"${CLAUDE_PLUGIN_ROOT}/scripts\" && uv run python -m tradingview_cli.monitor --headless",
+    "description": "TradingView headless Chrome browser — auto-launches, health-checks, and restarts on crash"
+  }
+]

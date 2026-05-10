@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.claude/*.local.md
+node_modules/
+*.egg-info/
+dist/
+build/
+scripts/.venv/
+.DS_Store
+*.tmp

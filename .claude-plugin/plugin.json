@@ -1,0 +1,11 @@
+{
+  "name": "tradingview",
+  "version": "0.2.0",
+  "description": "Read-only TradingView data access with persistent Chrome profile. Spot quotes, options chains, screener, news, watchlists, alerts, chart state, and screenshots.",
+  "author": {
+    "name": "esonhugh"
+  },
+  "experimental": {
+    "monitors": "./monitors/monitors.json"
+  }
+}
