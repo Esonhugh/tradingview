@@ -1,13 +1,16 @@
 # TradingView Claude Code 插件
 
-基于持久化无头 Chrome 的 TradingView 只读数据访问插件，具备自动生命周期管理能力。
+基于持久化无头 Chrome 的 TradingView 数据访问插件，支持多时间周期 K 线历史和内置技术指标分析。
 
 ## 功能特性
 
-- **15 个 slash 命令** — 覆盖行情报价、期权链、筛选器、新闻、自选列表、提醒、图表状态、截图
+- **17 个 slash 命令** — 覆盖 K 线历史、技术指标、行情报价、期权链、筛选器、新闻、自选列表、提醒、图表状态、截图
+- **K 线 / 蜡烛图历史** — 支持 1 分钟到月线所有周期，通过 CDP 从图表内部数据直接提取
+- **技术指标** — MACD、RSI、KDJ、布林带、EMA、SMA，基于提取的数据本地计算
 - **持久化 Chrome Profile** — 位于 `~/.claude/plugins/data/.chrome-profiles/tradingview`，登录一次永久有效
 - **跨会话 Cookie 持久化** — 登录 Cookie 自动保存到磁盘，浏览器重启后自动恢复，无需重新登录
 - **插件 Monitor** — Chrome 自动启动、每 10 秒健康检查、崩溃自动重启、端口冲突自动规避
+- **代理支持** — 支持 `HTTPS_PROXY`/`HTTP_PROXY` 环境变量
 - **3 个分析 Skill** — 筛选器、期权分析、新闻研究的引导式工作流
 
 ## 前置要求
@@ -49,6 +52,7 @@ uv sync
 | `/tradingview:stop` | 停止浏览器和 Monitor |
 | `/tradingview:status` | 检查连接状态和打开的标签页 |
 | `/tradingview:quote <ticker>` | 获取实时行情报价 |
+| `/tradingview:kline <ticker>` | 获取 K 线历史（多时间周期）+ 可选技术指标 |
 | `/tradingview:options-chain <ticker>` | 获取期权链（含 Greeks） |
 | `/tradingview:options-expiries <ticker>` | 列出可用到期日 |
 | `/tradingview:screener` | 运行股票/加密/外汇筛选器 |
@@ -96,8 +100,8 @@ Monitor 将状态信息输出到 stdout，Claude 以通知形式接收（如 "Ch
 
 ```
 tradingview/
-├── .claude-plugin/plugin.json  # 插件清单 (v0.2.0)
-├── commands/                   # 16 个 slash 命令
+├── .claude-plugin/plugin.json  # 插件清单 (v0.3.0)
+├── commands/                   # 17 个 slash 命令
 ├── skills/                     # 3 个分析工作流 Skill
 ├── monitors/                   # 插件 Monitor（自动管理 Chrome）
 │   └── monitors.json
@@ -108,7 +112,8 @@ tradingview/
         ├── monitor.py          # Monitor 守护进程（健康检查、自动重启）
         ├── browser.py          # Chrome 生命周期管理 + CDP Cookie 注入
         ├── client.py           # Cookie 收割 + 自动恢复 + 认证 HTTP 客户端
-        ├── commands.py         # 命令实现
+        ├── commands.py         # 命令实现（quote, kline, screener 等）
+        ├── indicators.py       # 技术指标（MACD, RSI, KDJ, 布林带, EMA/SMA）
         └── main.py             # CLI 分发器
 ```
 
@@ -126,6 +131,8 @@ tradingview/
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `TV_CDP_PORT` | `9333` | Chrome DevTools Protocol 端口 |
+| `HTTPS_PROXY` | (无) | TradingView API 请求的 HTTP 代理 |
+| `HTTP_PROXY` | (无) | HTTP 代理（备选） |
 
 ## 许可证
 

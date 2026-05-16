@@ -1,13 +1,16 @@
 # TradingView Claude Code Plugin
 
-Read-only TradingView data access via persistent headless Chrome with automatic lifecycle management.
+TradingView data access via persistent headless Chrome with automatic lifecycle management. Multi-timeframe K-line history and built-in technical indicators.
 
 ## Features
 
-- **15 slash commands** covering quotes, options, screener, news, watchlists, alerts, chart state, and screenshots
+- **17 slash commands** covering K-line history, technical indicators, quotes, options, screener, news, watchlists, alerts, chart state, and screenshots
+- **K-line / Candlestick history** — all timeframes from 1-minute to monthly, extracted via CDP from the chart's internal data store
+- **Technical indicators** — MACD, RSI, KDJ, Bollinger Bands, EMA, SMA computed locally on extracted data
 - **Persistent Chrome profile** at `~/.claude/plugins/data/.chrome-profiles/tradingview` — login once, access forever
 - **Cross-session cookie persistence** — session cookies are saved to disk and auto-restored when the browser restarts, no re-login needed
 - **Plugin monitor** — Chrome auto-launches, health-checks every 10s, auto-restarts on crash, port conflict resolution
+- **Proxy support** — respects `HTTPS_PROXY`/`HTTP_PROXY` environment variables
 - **3 analysis skills** for guided screener, options, and news workflows
 
 ## Prerequisites
@@ -49,6 +52,7 @@ For accounts with 2FA enabled, use `/tradingview:login-interactive` instead (ope
 | `/tradingview:stop` | Stop the browser and monitor |
 | `/tradingview:status` | Check connection status and open tabs |
 | `/tradingview:quote <ticker>` | Get real-time spot quote |
+| `/tradingview:kline <ticker>` | Fetch K-line history (multi-timeframe) with optional indicators |
 | `/tradingview:options-chain <ticker>` | Fetch options chain with Greeks |
 | `/tradingview:options-expiries <ticker>` | List available expiration dates |
 | `/tradingview:screener` | Run stock/crypto/forex screener |
@@ -96,8 +100,8 @@ After first-time login setup, all data commands work seamlessly without manual b
 
 ```
 tradingview/
-├── .claude-plugin/plugin.json  # Plugin manifest (v0.2.0)
-├── commands/                   # 16 slash commands
+├── .claude-plugin/plugin.json  # Plugin manifest (v0.3.0)
+├── commands/                   # 17 slash commands
 ├── skills/                     # 3 analysis workflow skills
 ├── monitors/                   # Plugin monitor (auto-manages Chrome)
 │   └── monitors.json
@@ -108,7 +112,8 @@ tradingview/
         ├── monitor.py          # Monitor daemon (health check, auto-restart)
         ├── browser.py          # Chrome lifecycle + cookie injection via CDP
         ├── client.py           # Cookie harvester + auto-restore + authenticated HTTP
-        ├── commands.py         # Command implementations
+        ├── commands.py         # Command implementations (quote, kline, screener, etc.)
+        ├── indicators.py       # Technical indicators (MACD, RSI, KDJ, Bollinger, EMA/SMA)
         └── main.py             # CLI dispatcher
 ```
 
@@ -126,6 +131,8 @@ tradingview/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TV_CDP_PORT` | `9333` | Chrome DevTools Protocol port |
+| `HTTPS_PROXY` | (none) | HTTP proxy for TradingView API requests |
+| `HTTP_PROXY` | (none) | HTTP proxy (fallback) |
 
 ## License
 

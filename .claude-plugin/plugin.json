@@ -1,7 +1,7 @@
 {
   "name": "tradingview",
-  "version": "0.2.0",
-  "description": "Read-only TradingView data access with persistent Chrome profile. Spot quotes, options chains, screener, news, watchlists, alerts, chart state, and screenshots.",
+  "version": "0.3.0",
+  "description": "TradingView data access with persistent Chrome profile. K-line history (multi-timeframe), technical indicators (MACD/RSI/KDJ/Bollinger), spot quotes, options chains, screener, news, watchlists, alerts, chart state, and screenshots.",
   "author": {
     "name": "esonhugh"
   },
