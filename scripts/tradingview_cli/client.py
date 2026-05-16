@@ -7,6 +7,7 @@ and provides authenticated fetch wrappers for all TradingView APIs.
 """
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -145,7 +146,9 @@ async def tv_fetch(url: str, method: str = "GET", json_body: dict | None = None,
     if headers:
         default_headers.update(headers)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("http_proxy") or os.environ.get("https_proxy")
+
+    async with httpx.AsyncClient(timeout=30.0, proxy=proxy) as client:
         if method.upper() == "POST":
             resp = await client.post(url, json=json_body, headers=default_headers)
         else:

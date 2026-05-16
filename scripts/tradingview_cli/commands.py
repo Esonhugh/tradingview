@@ -5,7 +5,7 @@ TradingView API Commands - All 12 command implementations.
 
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -350,6 +350,186 @@ async def cmd_alerts(alert_type: str = "list") -> dict:
                 normalized.append(a)
         return {"type": alert_type, "count": len(normalized), "alerts": normalized}
     return {"type": alert_type, "data": data}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  KLINE (Candlestick History)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RESOLUTION_MAP = {
+    "1": "1", "3": "3", "5": "5", "15": "15", "30": "30", "45": "45",
+    "1m": "1", "3m": "3", "5m": "5", "15m": "15", "30m": "30", "45m": "45",
+    "1h": "60", "2h": "120", "3h": "180", "4h": "240",
+    "60": "60", "120": "120", "180": "180", "240": "240",
+    "d": "D", "1d": "D", "D": "D",
+    "w": "W", "1w": "W", "W": "W",
+    "m": "M", "1M": "M", "M": "M",
+}
+
+
+async def cmd_kline(ticker: str, exchange: str = "NASDAQ",
+                    resolution: str = "D", bars: int = 100,
+                    indicators: list[str] | None = None) -> dict:
+    """Fetch OHLCV candlestick history via CDP from the running chart."""
+    import asyncio
+    import websockets
+    from .browser import get_status
+
+    status = get_status()
+    if not status["running"]:
+        return {"error": "Browser not running. Use /tradingview:launch first."}
+
+    port = status["port"]
+    symbol = f"{exchange}:{ticker}"
+    res = RESOLUTION_MAP.get(resolution, resolution)
+    bars = max(1, min(5000, bars))
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.get(f"http://127.0.0.1:{port}/json")
+        pages = resp.json()
+
+    tv_pages = [p for p in pages if "tradingview.com" in p.get("url", "") and p.get("type") == "page"]
+    if not tv_pages:
+        return {"error": "No TradingView page open in browser"}
+
+    chart_pages = [p for p in tv_pages if "/chart/" in p.get("url", "")]
+    target = chart_pages[0] if chart_pages else tv_pages[0]
+    ws_url = target["webSocketDebuggerUrl"]
+
+    async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:
+        # Check if chart already has the right symbol/resolution loaded
+        check_js = """
+        (() => {
+            try {
+                const coll = window._exposed_chartWidgetCollection;
+                if (!coll) return JSON.stringify({needNav: true});
+                const cw = coll.getAll()[0];
+                if (!cw) return JSON.stringify({needNav: true});
+                const model = cw.model();
+                const series = model.mainSeries();
+                const symStr = series.getSymbolString();
+                const curRes = cw.getResolution();
+                const loading = series.isLoading();
+                return JSON.stringify({symStr, curRes, loading});
+            } catch(e) {
+                return JSON.stringify({needNav: true, error: e.message});
+            }
+        })()
+        """
+        msg = json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"expression": check_js, "returnByValue": True}})
+        await ws.send(msg)
+        resp_msg = json.loads(await ws.recv())
+        state = json.loads(resp_msg.get("result", {}).get("result", {}).get("value", "{}"))
+
+        # Determine if we need to navigate
+        need_nav = state.get("needNav", False)
+        if not need_nav:
+            cur_sym = state.get("symStr", "")
+            cur_res = state.get("curRes", "")
+            if ticker.upper() not in cur_sym.upper() or cur_res != res or state.get("loading"):
+                need_nav = True
+
+        if need_nav:
+            # Navigate to chart URL with desired symbol/interval
+            chart_url = f"https://www.tradingview.com/chart/?symbol={symbol}&interval={res}"
+            nav_msg = json.dumps({"id": 2, "method": "Page.navigate", "params": {"url": chart_url}})
+            await ws.send(nav_msg)
+            await ws.recv()
+
+            # Initial delay for page to start loading and reinitialize
+            await asyncio.sleep(5.0)
+
+            # Wait for chart to fully load
+            for _ in range(30):
+                await asyncio.sleep(1.5)
+                poll_js = """
+                (() => {
+                    try {
+                        const coll = window._exposed_chartWidgetCollection;
+                        if (!coll) return JSON.stringify({ready: false});
+                        const cw = coll.getAll()[0];
+                        if (!cw) return JSON.stringify({ready: false});
+                        const model = cw.model();
+                        const series = model.mainSeries();
+                        const loading = series.isLoading();
+                        const size = series.seriesSource().data().size();
+                        return JSON.stringify({ready: !loading && size > 0, size, loading});
+                    } catch(e) {
+                        return JSON.stringify({ready: false});
+                    }
+                })()
+                """
+                msg = json.dumps({"id": 3, "method": "Runtime.evaluate", "params": {"expression": poll_js, "returnByValue": True}})
+                await ws.send(msg)
+                resp_msg = json.loads(await ws.recv())
+                poll_state = json.loads(resp_msg.get("result", {}).get("result", {}).get("value", "{}"))
+                if poll_state.get("ready"):
+                    break
+            else:
+                return {"error": "Chart data loading timed out", "symbol": symbol, "resolution": res}
+
+        # Extract OHLCV bars
+        extract_js = f"""
+        (() => {{
+            try {{
+                const coll = window._exposed_chartWidgetCollection;
+                const cw = coll.getAll()[0];
+                const model = cw.model();
+                const series = model.mainSeries();
+                const src = series.seriesSource();
+                const dataObj = src.data();
+
+                const bars = [];
+                dataObj.each((idx, bar) => {{
+                    bars.push([bar[0], bar[1], bar[2], bar[3], bar[4], bar[5]]);
+                }});
+
+                const symbol = series.getSymbolString();
+                const resolution = cw.getResolution();
+                const limit = {bars};
+                const output = bars.slice(-limit);
+
+                return JSON.stringify({{symbol, resolution, total: bars.length, bars: output}});
+            }} catch(e) {{
+                return JSON.stringify({{error: e.message}});
+            }}
+        }})()
+        """
+        msg = json.dumps({"id": 4, "method": "Runtime.evaluate", "params": {"expression": extract_js, "returnByValue": True}})
+        await ws.send(msg)
+        resp_msg = json.loads(await ws.recv())
+        val = resp_msg.get("result", {}).get("result", {}).get("value", "{}")
+        data = json.loads(val)
+
+    if data.get("error"):
+        return {"error": data["error"]}
+
+    raw_bars = data.get("bars", [])
+    candles = []
+    for bar in raw_bars:
+        candles.append({
+            "time": bar[0],
+            "date": datetime.fromtimestamp(bar[0], tz=timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            "open": bar[1],
+            "high": bar[2],
+            "low": bar[3],
+            "close": bar[4],
+            "volume": bar[5],
+        })
+
+    result = {
+        "symbol": symbol,
+        "resolution": res,
+        "count": len(candles),
+        "candles": candles,
+    }
+
+    # Compute technical indicators if requested
+    if indicators and candles:
+        from .indicators import summarize_indicators
+        result["indicators"] = summarize_indicators(candles, indicators)
+
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

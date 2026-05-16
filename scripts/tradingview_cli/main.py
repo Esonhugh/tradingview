@@ -61,7 +61,7 @@ async def run(cmd: str, args: dict) -> dict:
         programmatic_login, reset_cookie_cache, save_cookies_to_disk,
     )
     from tradingview_cli.commands import (
-        cmd_quote, cmd_options_chain, cmd_options_expiries,
+        cmd_quote, cmd_kline, cmd_options_chain, cmd_options_expiries,
         cmd_screener, cmd_search, cmd_news, cmd_watchlists,
         cmd_alerts, cmd_chart_state, cmd_screenshot,
     )
@@ -157,6 +157,19 @@ async def run(cmd: str, args: dict) -> dict:
             return {"error": "Missing --ticker argument"}
         return await cmd_quote(ticker, args.get("exchange", "NASDAQ"))
 
+    elif cmd == "kline":
+        ticker = args.get("ticker")
+        if not ticker:
+            return {"error": "Missing --ticker argument"}
+        ind_str = args.get("indicators", args.get("ind", ""))
+        indicators = [s.strip() for s in ind_str.split(",") if s.strip()] or None
+        return await cmd_kline(
+            ticker, args.get("exchange", "NASDAQ"),
+            resolution=args.get("resolution", args.get("interval", "D")),
+            bars=int(args.get("bars", args.get("limit", 100))),
+            indicators=indicators,
+        )
+
     elif cmd == "options-chain":
         ticker = args.get("ticker")
         if not ticker:
@@ -224,7 +237,7 @@ async def run(cmd: str, args: dict) -> dict:
     elif cmd == "help":
         return {"commands": [
             "launch", "login-interactive", "login-email", "stop", "ensure",
-            "status", "quote", "options-chain", "options-expiries", "screener",
+            "status", "quote", "kline", "options-chain", "options-expiries", "screener",
             "search", "news", "watchlists", "alerts", "chart-state", "screenshot",
         ]}
 
