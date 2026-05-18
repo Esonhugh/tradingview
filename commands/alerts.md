@@ -9,7 +9,7 @@ Read-only access to TradingView price alerts.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py alerts [--type=list]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py alerts [--type=list]
 ```
 
 ## Arguments

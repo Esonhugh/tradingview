@@ -1,4 +1,4 @@
-# TradingView Claude Code Plugin
+# TradingView Claude Code and Codex Plugin
 
 TradingView data access via persistent headless Chrome with automatic lifecycle management. Multi-timeframe K-line history and built-in technical indicators.
 
@@ -7,11 +7,12 @@ TradingView data access via persistent headless Chrome with automatic lifecycle 
 - **17 slash commands** covering K-line history, technical indicators, quotes, options, screener, news, watchlists, alerts, chart state, and screenshots
 - **K-line / Candlestick history** — all timeframes from 1-minute to monthly, extracted via CDP from the chart's internal data store
 - **Technical indicators** — MACD, RSI, KDJ, Bollinger Bands, EMA, SMA computed locally on extracted data
-- **Persistent Chrome profile** at `~/.claude/plugins/data/.chrome-profiles/tradingview` — login once, access forever
+- **Dual plugin manifests** — supports Claude Code (`.claude-plugin/plugin.json`) and Codex (`.codex-plugin/plugin.json`)
+- **Persistent Chrome profile** in host-specific plugin data — Codex uses `~/.codex/plugins/data/.chrome-profiles/tradingview`, Claude uses `~/.claude/plugins/data/.chrome-profiles/tradingview`
 - **Cross-session cookie persistence** — session cookies are saved to disk and auto-restored when the browser restarts, no re-login needed
 - **Plugin monitor** — Chrome auto-launches, health-checks every 10s, auto-restarts on crash, port conflict resolution
 - **Proxy support** — respects `HTTPS_PROXY`/`HTTP_PROXY` environment variables
-- **3 analysis skills** for guided screener, options, and news workflows
+- **4 skills** for general TradingView usage plus guided screener, options, and news workflows
 
 ## Prerequisites
 
@@ -34,7 +35,7 @@ uv sync
 /tradingview:login-email --email=you@example.com --password=yourpassword
 
 # 3. Session cookies are persisted to disk automatically
-#    They survive browser restarts and new Claude sessions
+#    They survive browser restarts and new Claude/Codex sessions
 
 # 4. Done! The plugin monitor auto-launches headless Chrome on every session
 ```
@@ -63,10 +64,18 @@ For accounts with 2FA enabled, use `/tradingview:login-interactive` instead (ope
 | `/tradingview:chart-state` | Read current chart symbol and interval |
 | `/tradingview:screenshot` | Capture chart as PNG |
 
+Codex does not use these Claude slash-command files directly. Install the Codex plugin manifest and use the bundled `tradingview` skill, or run the same CLI from the plugin root:
+
+```bash
+cd <plugin-root>/scripts
+uv run ./tradingview.py quote --ticker=AAPL --exchange=NASDAQ
+```
+
 ## Skills (contextual triggers)
 
 | Skill | Triggers |
 |-------|----------|
+| `tradingview` | "TradingView quote", "K-line history", "chart screenshot", "login to TradingView" |
 | `screener` | "screen stocks", "find oversold", "market scan", "top volume" |
 | `options-analysis` | "analyze options", "best expiry", "iron condor", "vertical spread" |
 | `news-research` | "AAPL news", "why did X move", "market headlines", "sentiment" |
@@ -80,11 +89,11 @@ The plugin supports two login methods:
 | **Email/password** | `/tradingview:login-email` | Default. Works headlessly, no browser window |
 | **Interactive** | `/tradingview:login-interactive` | Accounts with 2FA, or when email login fails |
 
-Session cookies are automatically persisted to `~/.claude/plugins/data/.chrome-profiles/tradingview/.tv_session.json`. When a new browser session starts without cookies, they are auto-restored from disk — no re-login required across Claude sessions or browser restarts.
+Session cookies are automatically persisted to the host-specific Chrome profile. When a new browser session starts without cookies, they are auto-restored from disk — no re-login required across Claude/Codex sessions or browser restarts.
 
 ## Plugin Monitor (Auto-Launch)
 
-The plugin uses Claude Code's native `monitors` component to automatically manage Chrome:
+The Claude plugin uses Claude Code's native `monitors` component to automatically manage Chrome. The Codex plugin includes a `SessionStart` hook that starts the same monitor when plugin hooks are enabled; Codex plugin hooks are disabled by default in the current release, so enable `[features].plugin_hooks = true` for auto-start or run `uv run ./tradingview.py launch` manually.
 
 - **Auto-start**: Monitor launches headless Chrome when the plugin loads
 - **Health checks**: CDP connectivity verified every 10 seconds
@@ -92,7 +101,7 @@ The plugin uses Claude Code's native `monitors` component to automatically manag
 - **Port conflict resolution**: If port 9333 is busy, auto-selects next available port
 - **State file**: Monitor writes state to `.monitor.json` for CLI commands to read
 
-The monitor outputs status lines to stdout, which Claude receives as notifications (e.g., "Chrome launched", "Chrome restarted after crash").
+The monitor outputs status lines to stdout, which the host receives as notifications/logs (e.g., "Chrome launched", "Chrome restarted after crash").
 
 After first-time login setup, all data commands work seamlessly without manual browser management.
 
@@ -101,8 +110,11 @@ After first-time login setup, all data commands work seamlessly without manual b
 ```
 tradingview/
 ├── .claude-plugin/plugin.json  # Plugin manifest (v0.3.0)
+├── .codex-plugin/plugin.json   # Codex plugin manifest (v0.3.0)
+├── .agents/plugins/            # Codex repo marketplace entry
 ├── commands/                   # 17 slash commands
-├── skills/                     # 3 analysis workflow skills
+├── hooks/                      # Codex SessionStart hook
+├── skills/                     # General and analysis workflow skills
 ├── monitors/                   # Plugin monitor (auto-manages Chrome)
 │   └── monitors.json
 └── scripts/                    # Python uv project
@@ -120,7 +132,7 @@ tradingview/
 ## Design Decisions
 
 1. **Monitor-based lifecycle**: Plugin monitor daemon manages Chrome with health checks and auto-restart, replacing manual launch/hook patterns
-2. **Persistent Chrome profile**: Login once at `~/.claude/plugins/data/.chrome-profiles/tradingview`, access persists across all sessions
+2. **Persistent Chrome profile**: Login once per host-specific plugin data directory, access persists across all sessions
 3. **Disk-backed cookie cache**: Session cookies saved to `.tv_session.json` and auto-restored into Chrome on new sessions — survives browser restarts without re-login
 4. **CDP health check**: Uses HTTP GET to `/json/version` instead of PID checks (Chrome headless spawns child processes)
 5. **Read-only by design**: No trade execution, alert creation, or watchlist modification

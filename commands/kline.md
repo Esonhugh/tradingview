@@ -9,7 +9,7 @@ Fetch historical candlestick (K-line) data from TradingView at various timeframe
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py kline --ticker=<SYMBOL> [--exchange=NASDAQ] [--resolution=D] [--bars=100] [--indicators=macd,rsi,kdj]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py kline --ticker=<SYMBOL> [--exchange=NASDAQ] [--resolution=D] [--bars=100] [--indicators=macd,rsi,kdj]
 ```
 
 ## Arguments

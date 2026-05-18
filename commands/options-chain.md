@@ -9,7 +9,7 @@ Fetch the options chain for an underlying ticker from TradingView scanner API.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py options-chain --ticker=<SYMBOL> [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py options-chain --ticker=<SYMBOL> [options]
 ```
 
 ## Arguments

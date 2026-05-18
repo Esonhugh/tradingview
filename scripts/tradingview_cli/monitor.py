@@ -2,10 +2,10 @@
 """
 TradingView Browser Monitor — plugin monitor daemon.
 
-Designed to run as a Claude Code plugin monitor (stdout → notifications to Claude).
+Designed to run as a Claude Code monitor or Codex hook-started background task.
 Manages Chrome lifecycle with health checks, auto-restart, and port conflict resolution.
 
-Outputs JSON status lines to stdout for Claude to consume as notifications.
+Outputs status lines to stdout for the host to consume as notifications/logs.
 """
 
 import json
@@ -16,11 +16,10 @@ import subprocess
 import shutil
 import sys
 import time
-from pathlib import Path
 
-PROFILE_DIR = Path.home() / ".claude" / "plugins" / "data" / ".chrome-profiles" / "tradingview"
-STATE_FILE = PROFILE_DIR / ".monitor.json"
-DEFAULT_CDP_PORT = 9333
+from .paths import PROFILE_DIR, STATE_FILE
+
+DEFAULT_CDP_PORT = int(os.environ.get("TV_CDP_PORT", "9333"))
 TRADINGVIEW_URL = "https://www.tradingview.com/chart/"
 HEALTH_INTERVAL = 10  # seconds between health checks
 MAX_RESTART_ATTEMPTS = 3
@@ -128,7 +127,7 @@ def run_monitor(port: int | None = None, headless: bool = True):
 
     # Resolve port
     if port is None:
-        port = DEFAULT_CDP_PORT
+        port = int(os.environ.get("TV_CDP_PORT", DEFAULT_CDP_PORT))
 
     # Check if CDP is already reachable (e.g. from a prior session)
     if check_cdp_health(port):

@@ -14,6 +14,7 @@ Run: uv run python -m pytest tests/ -v
 """
 
 import asyncio
+import importlib
 import json
 import os
 import sys
@@ -136,6 +137,37 @@ def test_browser_constants():
     assert "/.claude/plugins/data/.chrome-profiles/tradingview" in str(PROFILE_DIR)
     assert STATE_FILE.name == ".monitor.json"
     print("  PASS  test_browser_constants")
+
+
+def test_codex_path_detection():
+    """Path helper switches to Codex data root under Codex plugin env."""
+    import tradingview_cli.paths as paths
+
+    tracked = [
+        "TRADINGVIEW_DATA_DIR",
+        "TRADINGVIEW_PROFILE_DIR",
+        "TRADINGVIEW_PLUGIN_HOST",
+        "CODEX_HOME",
+        "CODEX_PLUGIN_ROOT",
+        "PLUGIN_ROOT",
+        "CLAUDE_PLUGIN_ROOT",
+    ]
+    saved = {key: os.environ.get(key) for key in tracked}
+    try:
+        for key in tracked:
+            os.environ.pop(key, None)
+        os.environ["PLUGIN_ROOT"] = "/tmp/codex-plugin"
+        reloaded = importlib.reload(paths)
+        assert "/.codex/plugins/data/.chrome-profiles/tradingview" in str(reloaded.PROFILE_DIR)
+    finally:
+        for key in tracked:
+            if saved[key] is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = saved[key]
+        importlib.reload(paths)
+
+    print("  PASS  test_codex_path_detection")
 
 
 def test_browser_read_state():
@@ -283,6 +315,10 @@ def test_plugin_structure():
     # Must exist
     must_exist = [
         ".claude-plugin/plugin.json",
+        ".codex-plugin/plugin.json",
+        ".agents/plugins/marketplace.json",
+        "hooks/hooks.json",
+        "hooks/session_start.sh",
         "monitors/monitors.json",
         "commands/launch.md",
         "commands/login-interactive.md",
@@ -303,6 +339,7 @@ def test_plugin_structure():
         "scripts/pyproject.toml",
         "scripts/tradingview.py",
         "scripts/tradingview_cli/monitor.py",
+        "scripts/tradingview_cli/paths.py",
         "scripts/tradingview_cli/browser.py",
         "scripts/tradingview_cli/main.py",
         "scripts/tradingview_cli/client.py",
@@ -310,6 +347,7 @@ def test_plugin_structure():
         "skills/news-research/SKILL.md",
         "skills/options-analysis/SKILL.md",
         "skills/screener/SKILL.md",
+        "skills/tradingview/SKILL.md",
         "README.md",
         "README-zh.md",
     ]
@@ -320,7 +358,6 @@ def test_plugin_structure():
     # Must NOT exist (removed/obsolete)
     must_not_exist = [
         "scripts/daemon.py",
-        "hooks/hooks.json",
         "hooks/ensure-browser.sh",
     ]
     for path in must_not_exist:
@@ -331,14 +368,53 @@ def test_plugin_structure():
 
 
 def test_plugin_json_valid():
-    """plugin.json has correct content."""
+    """Claude plugin.json has correct content."""
     plugin_root = Path(__file__).parent.parent.parent
     pj = json.loads((plugin_root / ".claude-plugin/plugin.json").read_text())
     assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.2.0"
-    assert "experimental" in pj
-    assert pj["experimental"]["monitors"] == "./monitors/monitors.json"
+    assert pj["version"] == "0.3.0"
+    assert pj["monitors"] == "./monitors/monitors.json"
     print("  PASS  test_plugin_json_valid")
+
+
+def test_codex_plugin_json_valid():
+    """Codex plugin.json has correct content."""
+    plugin_root = Path(__file__).parent.parent.parent
+    pj = json.loads((plugin_root / ".codex-plugin/plugin.json").read_text())
+    assert pj["name"] == "tradingview"
+    assert pj["version"] == "0.3.0"
+    assert pj["skills"] == "./skills/"
+    assert pj["hooks"] == "./hooks/hooks.json"
+    assert pj["interface"]["displayName"] == "TradingView"
+    assert pj["interface"]["category"] == "Finance"
+    assert "Read" in pj["interface"]["capabilities"]
+    print("  PASS  test_codex_plugin_json_valid")
+
+
+def test_codex_marketplace_json_valid():
+    """Codex marketplace entry has required policy and category."""
+    plugin_root = Path(__file__).parent.parent.parent
+    marketplace = json.loads((plugin_root / ".agents/plugins/marketplace.json").read_text())
+    assert marketplace["name"] == "esonhugh-tradingview"
+    assert marketplace["interface"]["displayName"] == "Esonhugh TradingView"
+    entry = marketplace["plugins"][0]
+    assert entry["name"] == "tradingview"
+    assert entry["source"] == {"source": "local", "path": "./"}
+    assert entry["policy"]["installation"] == "AVAILABLE"
+    assert entry["policy"]["authentication"] == "ON_INSTALL"
+    assert entry["category"] == "Finance"
+    print("  PASS  test_codex_marketplace_json_valid")
+
+
+def test_codex_hooks_json_valid():
+    """Codex hooks point at the SessionStart launcher."""
+    plugin_root = Path(__file__).parent.parent.parent
+    hooks = json.loads((plugin_root / "hooks/hooks.json").read_text())
+    session_start = hooks["hooks"]["SessionStart"][0]["hooks"][0]
+    assert session_start["type"] == "command"
+    assert "session_start.sh" in session_start["command"]
+    assert "statusMessage" in session_start
+    print("  PASS  test_codex_hooks_json_valid")
 
 
 def test_monitors_json_valid():
@@ -390,6 +466,7 @@ def run_all_tests():
         test_monitor_write_state,
         test_browser_get_status,
         test_browser_constants,
+        test_codex_path_detection,
         test_browser_read_state,
         test_browser_monitor_alive,
         test_cli_parse_args,
@@ -400,6 +477,9 @@ def run_all_tests():
         test_monitor_argparse,
         test_plugin_structure,
         test_plugin_json_valid,
+        test_codex_plugin_json_valid,
+        test_codex_marketplace_json_valid,
+        test_codex_hooks_json_valid,
         test_monitors_json_valid,
         test_no_stale_path_references,
     ]

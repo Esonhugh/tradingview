@@ -9,7 +9,7 @@ Read the current chart state (symbol, interval, layout ID) from an open TradingV
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py chart-state [--tab=<tab_id>]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py chart-state [--tab=<tab_id>]
 ```
 
 ## Arguments

@@ -9,7 +9,7 @@ Fetch news headlines from TradingView or read a full story by ID.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py news [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py news [options]
 ```
 
 ## Arguments

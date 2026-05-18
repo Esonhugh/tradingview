@@ -9,7 +9,7 @@ Search for symbols via TradingView's autocomplete/search API.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py search --query=<TEXT> [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py search --query=<TEXT> [options]
 ```
 
 ## Arguments

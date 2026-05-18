@@ -9,7 +9,7 @@ Capture a PNG screenshot of an open TradingView chart tab via CDP.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py screenshot [--output=<path>] [--tab=<tab_id>]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py screenshot [--output=<path>] [--tab=<tab_id>]
 ```
 
 ## Arguments

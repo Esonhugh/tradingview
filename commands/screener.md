@@ -9,7 +9,7 @@ Run the TradingView market screener with full filter/sort/column control.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py screener [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py screener [options]
 ```
 
 ## Arguments

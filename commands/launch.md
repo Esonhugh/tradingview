@@ -4,7 +4,7 @@ argument-hint: "[--headless=false] [--port=9333]"
 allowed-tools: ["Bash"]
 ---
 
-Launch or ensure the TradingView Chrome browser is running with persistent profile at `~/.claude/plugins/data/.chrome-profiles/tradingview`.
+Launch or ensure the TradingView Chrome browser is running with a persistent host-specific plugin profile.
 
 > **Note:** In normal operation, the plugin monitor automatically launches and manages Chrome in headless mode. This command is mainly useful for visible-mode login or manual troubleshooting.
 
@@ -18,7 +18,7 @@ command -v uv || echo "ERROR: Install uv first: curl -LsSf https://astral.sh/uv/
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py launch [--headless=false] [--port=9333]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py launch [--headless=false] [--port=9333]
 ```
 
 Options:

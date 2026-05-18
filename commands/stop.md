@@ -6,7 +6,7 @@ allowed-tools: ["Bash"]
 Stop the TradingView monitor daemon and its managed Chrome browser instance.
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py stop
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py stop
 ```
 
 Returns JSON with termination status. This stops both the monitor daemon process and the Chrome browser it manages.

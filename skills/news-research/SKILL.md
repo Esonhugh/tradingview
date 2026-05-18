@@ -3,7 +3,7 @@ name: news-research
 description: "Use when researching market news, analyzing sentiment for a symbol, finding catalysts, or reviewing sector headlines. Triggers: 'what news on', 'AAPL news', 'market headlines', 'why did X move', 'read the article about', 'news sentiment'."
 ---
 
-Guide Claude through TradingView news research and sentiment analysis.
+Guide Codex or Claude through TradingView news research and sentiment analysis.
 
 ## News Research Workflow
 
@@ -15,7 +15,7 @@ Guide Claude through TradingView news research and sentiment analysis.
 ## Core Commands
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts"
 
 # Fetch headlines for a symbol
 uv run ./tradingview.py news --symbol=NASDAQ:AAPL --limit=10

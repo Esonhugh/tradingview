@@ -3,7 +3,7 @@ name: screener
 description: "Use when analyzing market conditions, scanning for stocks matching criteria, building watchlists from screener results, or comparing sectors. Triggers: 'screen stocks', 'find stocks with', 'market scan', 'oversold stocks', 'top volume stocks', 'crypto screener'."
 ---
 
-Guide Claude through constructing and interpreting TradingView screener queries for market analysis.
+Guide Codex or Claude through constructing and interpreting TradingView screener queries for market analysis.
 
 ## Screener Workflow
 
@@ -15,7 +15,7 @@ Guide Claude through constructing and interpreting TradingView screener queries 
 ## Running the Screener
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py screener [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py screener [options]
 ```
 
 ## Available Markets

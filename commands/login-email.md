@@ -15,7 +15,7 @@ Login to TradingView using email and password without opening a visible browser.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py login-email --email=user@example.com --password=secret
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py login-email --email=user@example.com --password=secret
 ```
 
 ## How It Works
@@ -32,4 +32,4 @@ cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py login-email --email=
 
 ## After Login
 
-The session persists in the Chrome profile. Session cookies are also saved to disk (`~/.claude/plugins/data/.chrome-profiles/tradingview/.tv_session.json`) and auto-restored on future browser restarts. All other commands (`watchlists`, `quote`, `alerts`, etc.) work immediately.
+The session persists in the Chrome profile. Session cookies are also saved to disk under the host-specific plugin data directory (`~/.codex/plugins/data/...` for Codex, `~/.claude/plugins/data/...` for Claude) and auto-restored on future browser restarts. All other commands (`watchlists`, `quote`, `alerts`, etc.) work immediately.

@@ -2,7 +2,7 @@
 """
 TradingView Browser Manager — interface to plugin monitor daemon.
 
-The monitor (monitors/monitors.json → monitor.py) runs as a Claude Code plugin
+The monitor runs as a Claude Code plugin monitor or Codex plugin hook-launched
 background process. This module reads its state and provides APIs for CLI commands.
 
 For the `login` command (non-headless), it can also launch Chrome directly.
@@ -15,13 +15,12 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 import httpx
 
-PROFILE_DIR = Path.home() / ".claude" / "plugins" / "data" / ".chrome-profiles" / "tradingview"
-STATE_FILE = PROFILE_DIR / ".monitor.json"
-DEFAULT_CDP_PORT = 9333
+from .paths import PROFILE_DIR, STATE_FILE
+
+DEFAULT_CDP_PORT = int(os.environ.get("TV_CDP_PORT", "9333"))
 TRADINGVIEW_URL = "https://www.tradingview.com/chart/"
 
 
@@ -108,8 +107,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
 
     if headless:
         # Start via monitor daemon
-        monitor_script = Path(__file__).parent / "monitor.py"
-        cmd = [sys.executable, str(monitor_script), f"--port={port}"]
+        cmd = [sys.executable, "-m", "tradingview_cli.monitor", f"--port={port}"]
 
         proc = subprocess.Popen(
             cmd,

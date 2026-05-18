@@ -17,7 +17,7 @@ fi
 echo "uv: $(uv --version)"
 
 # 2. Check dependencies are synced
-cd ${CLAUDE_PLUGIN_ROOT}/scripts
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts"
 if [ ! -d .venv ]; then
     echo "Dependencies not synced. Running uv sync..."
     uv sync
@@ -28,7 +28,7 @@ echo "venv: OK"
 uv run ./tradingview.py status
 
 # 4. Check Chrome profile
-if [ -d ~/.claude/plugins/data/.chrome-profiles/tradingview ]; then
+if [ -d ~/.codex/plugins/data/.chrome-profiles/tradingview ] || [ -d ~/.claude/plugins/data/.chrome-profiles/tradingview ]; then
     echo "Chrome profile: EXISTS"
 else
     echo "Chrome profile: NOT FOUND (will be created on first launch)"

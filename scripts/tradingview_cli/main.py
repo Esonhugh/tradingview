@@ -24,6 +24,7 @@ Commands:
 
 import asyncio
 import json
+import os
 import sys
 
 import httpx
@@ -66,7 +67,7 @@ async def run(cmd: str, args: dict) -> dict:
         cmd_alerts, cmd_chart_state, cmd_screenshot,
     )
 
-    port = int(args.get("port", DEFAULT_CDP_PORT))
+    port = int(args.get("port", os.environ.get("TV_CDP_PORT", DEFAULT_CDP_PORT)))
     headless = args.get("headless", "true") != "false"
 
     if cmd == "launch":

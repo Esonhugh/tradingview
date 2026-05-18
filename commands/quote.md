@@ -9,7 +9,7 @@ Fetch a real-time spot quote from TradingView for a given ticker symbol.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py quote --ticker=<SYMBOL> [--exchange=NASDAQ]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py quote --ticker=<SYMBOL> [--exchange=NASDAQ]
 ```
 
 ## Arguments

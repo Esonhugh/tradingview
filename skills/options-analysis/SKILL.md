@@ -3,7 +3,7 @@ name: options-analysis
 description: "Use when analyzing options strategies, finding optimal strikes/expiries, calculating payoff scenarios, or building options positions. Triggers: 'analyze options', 'best expiry for', 'options strategy', 'iron condor on', 'vertical spread', 'covered call analysis'."
 ---
 
-Guide Claude through TradingView options data analysis for strategy evaluation.
+Guide Codex or Claude through TradingView options data analysis for strategy evaluation.
 
 ## Options Analysis Workflow
 
@@ -16,7 +16,7 @@ Guide Claude through TradingView options data analysis for strategy evaluation.
 ## Core Commands
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts"
 
 # Step 1: Check available expirations
 uv run ./tradingview.py options-expiries --ticker=<SYM> --exchange=NASDAQ

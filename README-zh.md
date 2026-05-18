@@ -1,4 +1,4 @@
-# TradingView Claude Code 插件
+# TradingView Claude Code 与 Codex 插件
 
 基于持久化无头 Chrome 的 TradingView 数据访问插件，支持多时间周期 K 线历史和内置技术指标分析。
 
@@ -7,11 +7,12 @@
 - **17 个 slash 命令** — 覆盖 K 线历史、技术指标、行情报价、期权链、筛选器、新闻、自选列表、提醒、图表状态、截图
 - **K 线 / 蜡烛图历史** — 支持 1 分钟到月线所有周期，通过 CDP 从图表内部数据直接提取
 - **技术指标** — MACD、RSI、KDJ、布林带、EMA、SMA，基于提取的数据本地计算
-- **持久化 Chrome Profile** — 位于 `~/.claude/plugins/data/.chrome-profiles/tradingview`，登录一次永久有效
+- **双插件清单** — 同时支持 Claude Code (`.claude-plugin/plugin.json`) 和 Codex (`.codex-plugin/plugin.json`)
+- **持久化 Chrome Profile** — 位于宿主专用插件数据目录：Codex 使用 `~/.codex/plugins/data/.chrome-profiles/tradingview`，Claude 使用 `~/.claude/plugins/data/.chrome-profiles/tradingview`
 - **跨会话 Cookie 持久化** — 登录 Cookie 自动保存到磁盘，浏览器重启后自动恢复，无需重新登录
 - **插件 Monitor** — Chrome 自动启动、每 10 秒健康检查、崩溃自动重启、端口冲突自动规避
 - **代理支持** — 支持 `HTTPS_PROXY`/`HTTP_PROXY` 环境变量
-- **3 个分析 Skill** — 筛选器、期权分析、新闻研究的引导式工作流
+- **4 个 Skill** — 通用 TradingView 使用，以及筛选器、期权分析、新闻研究的引导式工作流
 
 ## 前置要求
 
@@ -34,7 +35,7 @@ uv sync
 /tradingview:login-email --email=you@example.com --password=yourpassword
 
 # 3. 登录 Cookie 自动保存到磁盘
-#    跨 Claude 会话和浏览器重启后自动恢复
+#    跨 Claude/Codex 会话和浏览器重启后自动恢复
 
 # 4. 完成！插件 Monitor 会在每次会话自动启动无头 Chrome
 ```
@@ -63,10 +64,18 @@ uv sync
 | `/tradingview:chart-state` | 读取当前图表标的和周期 |
 | `/tradingview:screenshot` | 截取图表为 PNG |
 
+Codex 不直接使用这些 Claude slash-command 文件。安装 Codex 插件清单后可使用内置 `tradingview` skill，或从插件根目录直接运行同一个 CLI：
+
+```bash
+cd <plugin-root>/scripts
+uv run ./tradingview.py quote --ticker=AAPL --exchange=NASDAQ
+```
+
 ## Skills（上下文触发）
 
 | Skill | 触发词 |
 |-------|--------|
+| `tradingview` | "TradingView 行情"、"K 线历史"、"图表截图"、"登录 TradingView" |
 | `screener` | "筛选股票"、"找超卖"、"市场扫描"、"成交量排名" |
 | `options-analysis` | "分析期权"、"最佳到期日"、"铁鹰策略"、"垂直价差" |
 | `news-research` | "AAPL 新闻"、"为什么涨/跌"、"市场头条"、"情绪分析" |
@@ -80,11 +89,11 @@ uv sync
 | **邮箱密码** | `/tradingview:login-email` | 默认方式。无需浏览器窗口，适合 CLI/无头环境 |
 | **交互式** | `/tradingview:login-interactive` | 开启 2FA 的账户，或邮箱登录失败时使用 |
 
-登录 Cookie 自动持久化到 `~/.claude/plugins/data/.chrome-profiles/tradingview/.tv_session.json`。新浏览器会话启动时若无 Cookie，将自动从磁盘恢复 — 跨 Claude 会话或浏览器重启均无需重新登录。
+登录 Cookie 自动持久化到宿主专用 Chrome Profile。新浏览器会话启动时若无 Cookie，将自动从磁盘恢复 — 跨 Claude/Codex 会话或浏览器重启均无需重新登录。
 
 ## 插件 Monitor（自动启动）
 
-插件使用 Claude Code 原生 `monitors` 组件自动管理 Chrome：
+Claude 插件使用 Claude Code 原生 `monitors` 组件自动管理 Chrome。Codex 插件包含 `SessionStart` hook；启用 plugin hooks 后会启动同一个 monitor。当前 Codex 版本默认关闭 plugin hooks，如需自动启动请启用 `[features].plugin_hooks = true`，否则可手动运行 `uv run ./tradingview.py launch`。
 
 - **自动启动**：插件加载时 Monitor 自动启动无头 Chrome
 - **健康检查**：每 10 秒通过 CDP HTTP 验证连接
@@ -92,7 +101,7 @@ uv sync
 - **端口冲突规避**：若 9333 端口被占用，自动选择下一个可用端口
 - **状态文件**：Monitor 写入 `.monitor.json`，CLI 命令通过读取该文件获取运行状态
 
-Monitor 将状态信息输出到 stdout，Claude 以通知形式接收（如 "Chrome launched"、"Chrome restarted after crash"）。
+Monitor 将状态信息输出到 stdout，宿主以通知或日志形式接收（如 "Chrome launched"、"Chrome restarted after crash"）。
 
 首次登录设置完成后，所有数据命令无需手动管理浏览器即可正常工作。
 
@@ -101,8 +110,11 @@ Monitor 将状态信息输出到 stdout，Claude 以通知形式接收（如 "Ch
 ```
 tradingview/
 ├── .claude-plugin/plugin.json  # 插件清单 (v0.3.0)
+├── .codex-plugin/plugin.json   # Codex 插件清单 (v0.3.0)
+├── .agents/plugins/            # Codex repo marketplace 条目
 ├── commands/                   # 17 个 slash 命令
-├── skills/                     # 3 个分析工作流 Skill
+├── hooks/                      # Codex SessionStart hook
+├── skills/                     # 通用和分析工作流 Skill
 ├── monitors/                   # 插件 Monitor（自动管理 Chrome）
 │   └── monitors.json
 └── scripts/                    # Python uv 项目
@@ -120,7 +132,7 @@ tradingview/
 ## 设计理念
 
 1. **Monitor 生命周期管理**：插件 Monitor 守护进程管理 Chrome，具备健康检查和自动重启能力，取代手动启动/Hook 模式
-2. **持久化 Chrome Profile**：在 `~/.claude/plugins/data/.chrome-profiles/tradingview` 一次登录，跨会话保持
+2. **持久化 Chrome Profile**：每个宿主使用自己的插件数据目录，登录后跨会话保持
 3. **磁盘 Cookie 缓存**：登录 Cookie 保存到 `.tv_session.json`，新会话时自动恢复注入 Chrome — 浏览器重启无需重新登录
 4. **CDP 健康检查**：通过 HTTP GET `/json/version` 检测存活，而非 PID 检查（Chrome headless 会产生子进程）
 5. **只读设计**：不执行交易、不创建提醒、不修改自选

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/hooks/session_start.sh\"",
+            "statusMessage": "Starting TradingView browser monitor"
+          }
+        ]
+      }
+    ]
+  }
+}

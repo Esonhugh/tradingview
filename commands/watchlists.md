@@ -9,7 +9,7 @@ Read-only access to TradingView custom watchlists and color-flag lists.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py watchlists [options]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py watchlists [options]
 ```
 
 ## Arguments

@@ -9,12 +9,12 @@ and provides authenticated fetch wrappers for all TradingView APIs.
 import json
 import os
 import time
-from pathlib import Path
 
 import httpx
 import websockets
 
 from .browser import get_ws_endpoint, inject_cookies
+from .paths import COOKIE_CACHE_FILE
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -22,13 +22,6 @@ USER_AGENT = (
 )
 
 _cookie_cache: str | None = None
-
-# Persistent cookie cache in plugin data directory
-COOKIE_CACHE_FILE = (
-    Path.home() / ".claude" / "plugins" / "data"
-    / ".chrome-profiles" / "tradingview" / ".tv_session.json"
-)
-
 
 def save_cookies_to_disk(cookies: list[dict], user: dict | None = None) -> None:
     """Persist login cookies to disk for reuse across sessions."""

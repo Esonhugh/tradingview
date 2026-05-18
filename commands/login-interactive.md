@@ -4,7 +4,7 @@ argument-hint: "[--port=9333]"
 allowed-tools: ["Bash"]
 ---
 
-Launch Chrome in **visible (non-headless) mode** and navigate to TradingView login page. The user logs in manually; the session (cookies, localStorage) persists in `~/.claude/plugins/data/.chrome-profiles/tradingview` for all future headless commands.
+Launch Chrome in **visible (non-headless) mode** and navigate to TradingView login page. The user logs in manually; the session (cookies, localStorage) persists in the host-specific plugin data directory for all future headless commands.
 
 ## When to Use
 
@@ -17,13 +17,13 @@ Launch Chrome in **visible (non-headless) mode** and navigate to TradingView log
 1. Stop any existing headless browser instance first:
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py stop
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py stop
 ```
 
 2. Launch in visible mode and navigate to login:
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py login-interactive --port=9333
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py login-interactive --port=9333
 ```
 
 3. **Tell the user** to complete login in the browser window that appears. Wait for their confirmation.
@@ -31,13 +31,13 @@ cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py login-interactive --
 4. After user confirms login is done, verify the session works (this also auto-saves cookies to disk for future sessions):
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py watchlists
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py watchlists
 ```
 
 5. Stop the visible browser and restart headless:
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py stop && uv run ./tradingview.py launch
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py stop && uv run ./tradingview.py launch
 ```
 
 ## Important

@@ -9,7 +9,7 @@ List all available option expiration dates with DTE and contract counts.
 ## Usage
 
 ```bash
-cd ${CLAUDE_PLUGIN_ROOT}/scripts && uv run ./tradingview.py options-expiries --ticker=<SYMBOL> [--exchange=NASDAQ] [--include-expired=false]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py options-expiries --ticker=<SYMBOL> [--exchange=NASDAQ] [--include-expired=false]
 ```
 
 ## Arguments
