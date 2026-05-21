@@ -80,6 +80,19 @@ uv run ./tradingview.py quote --ticker=AAPL --exchange=NASDAQ
 | `options-analysis` | "analyze options", "best expiry", "iron condor", "vertical spread" |
 | `news-research` | "AAPL news", "why did X move", "market headlines", "sentiment" |
 
+### Research Workflows
+
+The TradingView skills can combine existing read-only commands into research workflows:
+
+| Workflow | Combines | Use When |
+|----------|----------|----------|
+| Market Snapshot | `quote`, `kline`, `news` | You want a quick read on one symbol |
+| Screener Brief | `screener`, optional `quote`/`kline` follow-up | You want a shortlist from market criteria |
+| Options Research | `quote`, `options-expiries`, `options-chain` | You want expiry, chain, liquidity, and strategy framing |
+| News Catalyst Review | `news`, optional `quote`/`kline` | You want to understand headlines, sentiment, and price reaction |
+
+All workflows are read-only and provide research context rather than trade recommendations.
+
 ## Authentication
 
 The plugin supports two login methods:

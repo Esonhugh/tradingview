@@ -80,6 +80,19 @@ uv run ./tradingview.py quote --ticker=AAPL --exchange=NASDAQ
 | `options-analysis` | "分析期权"、"最佳到期日"、"铁鹰策略"、"垂直价差" |
 | `news-research` | "AAPL 新闻"、"为什么涨/跌"、"市场头条"、"情绪分析" |
 
+### 研究工作流
+
+TradingView skills 可以把现有只读命令组合成研究工作流：
+
+| 工作流 | 组合命令 | 适用场景 |
+|--------|----------|----------|
+| Market Snapshot | `quote`, `kline`, `news` | 快速查看单个标的的价格、趋势和新闻 |
+| Screener Brief | `screener`，可追加 `quote` / `kline` | 根据筛选条件生成候选列表 |
+| Options Research | `quote`, `options-expiries`, `options-chain` | 查看到期日、期权链、流动性和策略框架 |
+| News Catalyst Review | `news`，可追加 `quote` / `kline` | 理解新闻催化剂、情绪和价格反应 |
+
+所有工作流都是只读研究用途，不提供交易建议。
+
 ## 认证方式
 
 插件支持两种登录方式：

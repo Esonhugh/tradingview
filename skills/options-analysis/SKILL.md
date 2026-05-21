@@ -1,66 +1,65 @@
 ---
 name: options-analysis
-description: "Use when analyzing options strategies, finding optimal strikes/expiries, calculating payoff scenarios, or building options positions. Triggers: 'analyze options', 'best expiry for', 'options strategy', 'iron condor on', 'vertical spread', 'covered call analysis'."
+description: >
+  Use when analyzing options chains, expirations, implied volatility, Greeks, liquidity,
+  payoff scenarios, covered calls, vertical spreads, iron condors, straddles, strangles,
+  protective puts, collars, 期权链, 到期日, 隐含波动率, 希腊值, 备兑看涨, 垂直价差,
+  跨式, 勒式, or options strategy research.
 ---
 
-Guide Codex or Claude through TradingView options data analysis for strategy evaluation.
+Guide TradingView options data analysis for research and strategy framing. Follow the user's language for the response.
 
-## Options Analysis Workflow
+## Workflow
 
-1. Fetch available expiries for the underlying
-2. Select relevant expiration(s)
-3. Pull options chain data
-4. Analyze Greeks, IV, and bid-ask spreads
-5. Recommend strategy parameters
+1. Get the underlying quote first unless the user already provided a spot price.
+2. Fetch available expiries.
+3. Select expiry using the user's timeframe; default to 30-45 DTE only when the user asks for income or neutral premium strategies.
+4. Fetch the options chain for the selected expiry.
+5. Analyze liquidity first, then Greeks/IV, then payoff framing.
+6. Present tradeoffs without telling the user to open the trade.
 
 ## Core Commands
 
 ```bash
 cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts"
-
-# Step 1: Check available expirations
+uv run ./tradingview.py quote --ticker=<SYM> --exchange=NASDAQ
 uv run ./tradingview.py options-expiries --ticker=<SYM> --exchange=NASDAQ
-
-# Step 2: Fetch chain for specific expiry
-uv run ./tradingview.py options-chain --ticker=<SYM> --expiry=2025-06-20 --strikes-around-spot=10
-
-# Step 3: Get spot price for reference
-uv run ./tradingview.py quote --ticker=<SYM>
+uv run ./tradingview.py options-chain --ticker=<SYM> --exchange=NASDAQ --expiry=2025-06-20 --strikes-around-spot=10
 ```
 
 ## Strategy Templates
 
 ### Covered Call
-1. Get quote for current price
-2. Get expiries → pick 30-45 DTE
-3. Get calls at that expiry, OTM strikes
-4. Look for: delta 0.25-0.35, decent premium, low bid-ask spread
 
-### Vertical Spread (Bull Call)
-1. Get expiries → pick target DTE
-2. Get call chain at that expiry
-3. Buy ATM call, sell OTM call
-4. Evaluate: max profit, max loss, breakeven
+- Look for 30-45 DTE when the user wants income.
+- Focus on OTM calls, delta around 0.25-0.35 when available.
+- Reject or warn on wide bid-ask spreads and low returned volume.
+
+### Vertical Spread
+
+- Use the user's directional thesis.
+- Compare debit/credit, max profit, max loss, and breakeven.
+- Prefer strikes with tighter spreads and higher returned volume when possible.
 
 ### Iron Condor
-1. Get expiries → pick 30-45 DTE
-2. Get full chain (calls + puts)
-3. Sell OTM call + OTM put (delta ~0.15-0.20)
-4. Buy further OTM for protection
-5. Calculate: credit received, max risk, probability of profit
 
-## Key Metrics to Present
-
-- **IV vs Historical**: Is implied vol high or low?
-- **Bid-Ask Spread**: Wider = less liquid
-- **Open Interest**: Higher = more liquid
-- **Delta**: Probability proxy (|delta| ≈ ITM probability)
-- **Theta**: Daily time decay
-- **Gamma**: Rate of delta change
+- Use only when the user asks for range-bound or neutral premium ideas.
+- Start with short strikes around delta 0.15-0.20 when available.
+- Warn when IV, liquidity, or event risk makes the setup fragile.
 
 ## Output Format
 
-Present results as structured tables with:
-- Strike, Type, Bid, Ask, Mid, IV, Delta, Theta, OI, Volume
-- Highlight ATM strike
-- Mark recommended strikes based on strategy
+Return:
+
+1. **Underlying Context** — spot price, daily move, and selected expiry.
+2. **Chain Snapshot** — table with strike, type, bid, ask, mid, IV, delta, theta, and volume when available.
+3. **Liquidity Check** — spread width, returned volume, and any strikes to avoid.
+4. **Strategy Framing** — candidate structure, max risk/reward if derivable, breakeven, and assumptions.
+5. **Risks & Follow-up** — earnings/events, liquidity, IV crush, assignment, and data staleness.
+
+## Guardrails
+
+- This is options research, not financial advice.
+- Do not invent missing Greeks or premiums.
+- If bid/ask and volume are missing, say liquidity cannot be assessed from returned data.
+- Do not recommend execution; phrase conclusions as setups to review.

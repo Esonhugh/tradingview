@@ -1,52 +1,52 @@
 ---
 name: news-research
-description: "Use when researching market news, analyzing sentiment for a symbol, finding catalysts, or reviewing sector headlines. Triggers: 'what news on', 'AAPL news', 'market headlines', 'why did X move', 'read the article about', 'news sentiment'."
+description: >
+  Use when researching TradingView market news, symbol headlines, catalysts, sentiment,
+  sector headlines, why a stock moved, full story reading, 新闻, 催化剂, 市场头条,
+  情绪分析, 个股新闻, 财经新闻, or reading a TradingView news story.
 ---
 
-Guide Codex or Claude through TradingView news research and sentiment analysis.
+Guide TradingView news research from headlines to catalyst interpretation. Follow the user's language for the response.
 
-## News Research Workflow
+## Workflow
 
-1. Fetch relevant headlines (by symbol, category, or broad)
-2. Identify key stories
-3. Read full stories for detail
-4. Summarize catalysts and sentiment
+1. Fetch headlines by symbol, category, area, section, provider, or language.
+2. Identify stories that explain price movement, earnings, guidance, macro, regulation, M&A, product, or sector rotation.
+3. Read full stories by ID only for the most relevant headlines.
+4. Cross-check with quote or K-line only when the user asks about market reaction or why the symbol moved.
+5. Summarize catalysts and uncertainty.
 
 ## Core Commands
 
 ```bash
 cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts"
-
-# Fetch headlines for a symbol
 uv run ./tradingview.py news --symbol=NASDAQ:AAPL --limit=10
-
-# Fetch headlines by category
 uv run ./tradingview.py news --category=market --limit=20
-
-# Read full story
 uv run ./tradingview.py news --id=<story_id>
+uv run ./tradingview.py quote --ticker=AAPL --exchange=NASDAQ
 ```
 
 ## Available Filters
 
-- `--symbol`: TradingView symbol (format: `EXCHANGE:TICKER`)
-- `--category`: `market`, `economy`, `stock`, `crypto`, `forex`, `commodities`
-- `--area`: Geographic area
-- `--section`: News section
-- `--provider`: Specific news provider
-- `--lang`: Language code (default `en`)
-
-## Analysis Steps
-
-1. **Scan Headlines**: Pull 10-20 recent headlines for context
-2. **Identify Movers**: Correlate with price action from `/tradingview:quote`
-3. **Deep Read**: Use `--id` to read full articles on key stories
-4. **Summarize**: Provide bull/bear thesis based on news flow
+- `--symbol`: TradingView symbol, e.g. `NASDAQ:AAPL`.
+- `--category`: `market`, `economy`, `stock`, `crypto`, `forex`, `commodities`.
+- `--area`: geographic area.
+- `--section`: news section.
+- `--provider`: specific news provider.
+- `--lang`: language code.
 
 ## Output Format
 
-Present findings as:
-- **Key Headlines** with timestamps
-- **Sentiment Assessment**: Bullish / Bearish / Neutral
-- **Catalysts Identified**: Earnings, guidance, macro events
-- **Suggested Actions**: Further research, related symbols to monitor
+Return:
+
+1. **Headline Brief** — table with time, source, headline, and story ID when available.
+2. **Catalyst Map** — classify each major story as earnings, guidance, macro, rates, regulation, M&A, product, legal, sector, or other.
+3. **Sentiment Read** — bullish, bearish, mixed, or neutral, with evidence.
+4. **Market Reaction** — quote/K-line context only if fetched or provided.
+5. **What to Watch Next** — follow-up data points, related symbols, upcoming events.
+
+## Guardrails
+
+- Separate confirmed article facts from interpretation.
+- Do not infer sentiment from headlines alone when full story context is necessary; label it as tentative.
+- If the user asks why a stock moved, include price reaction only after fetching quote or K-line data.
