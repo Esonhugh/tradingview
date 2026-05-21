@@ -372,7 +372,7 @@ def test_plugin_json_valid():
     plugin_root = Path(__file__).parent.parent.parent
     pj = json.loads((plugin_root / ".claude-plugin/plugin.json").read_text())
     assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.3.0"
+    assert pj["version"] == "0.4.0"
     assert pj["monitors"] == "./monitors/monitors.json"
     print("  PASS  test_plugin_json_valid")
 
@@ -382,7 +382,7 @@ def test_codex_plugin_json_valid():
     plugin_root = Path(__file__).parent.parent.parent
     pj = json.loads((plugin_root / ".codex-plugin/plugin.json").read_text())
     assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.3.0"
+    assert pj["version"] == "0.4.0"
     assert pj["skills"] == "./skills/"
     assert pj["hooks"] == "./hooks/hooks.json"
     assert pj["interface"]["displayName"] == "TradingView"

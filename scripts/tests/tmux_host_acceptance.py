@@ -92,7 +92,7 @@ def test_claude() -> None:
         run(["claude", "plugin", "list", "--available", "--json"], env=claude_env)
     )
     assert any(
-        item.get("name") == "tradingview" and item.get("version") == "0.3.0"
+        item.get("name") == "tradingview" and item.get("version") == "0.4.0"
         for item in available.get("available", [])
     ), available
     print("CLAUDE_MARKETPLACE_AVAILABLE_OK", flush=True)
@@ -133,7 +133,7 @@ def test_codex() -> None:
     marketplace = json.loads((ROOT / ".agents/plugins/marketplace.json").read_text())
     entry = marketplace["plugins"][0]
     assert plugin["name"] == entry["name"] == "tradingview"
-    assert plugin["version"] == "0.3.0"
+    assert plugin["version"] == "0.4.0"
     assert entry["source"] == {"source": "local", "path": "./"}
     assert entry["policy"]["installation"] == "AVAILABLE"
     assert entry["policy"]["authentication"] == "ON_INSTALL"
