@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "TradingView Claude Code plugin — multi-timeframe K-line history, technical indicators (MACD/RSI/KDJ/Bollinger), and comprehensive market data via persistent headless Chrome",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "plugins": [
     {
@@ -15,7 +15,7 @@
         "url": "https://github.com/Esonhugh/tradingview.git"
       },
       "description": "TradingView data access with persistent headless Chrome — K-line/candlestick history (1m to monthly), built-in technical indicators (MACD, RSI, KDJ, Bollinger Bands, EMA/SMA), spot quotes, options chains, screener, news, watchlists, alerts, chart state, and screenshots.",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "author": {
         "name": "Esonhugh"
       },

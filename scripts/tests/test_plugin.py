@@ -520,7 +520,7 @@ def test_plugin_json_valid():
     plugin_root = Path(__file__).parent.parent.parent
     pj = json.loads((plugin_root / ".claude-plugin/plugin.json").read_text())
     assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.4.0"
+    assert pj["version"] == "0.4.1"
     assert pj["monitors"] == "./monitors/monitors.json"
     print("  PASS  test_plugin_json_valid")
 
