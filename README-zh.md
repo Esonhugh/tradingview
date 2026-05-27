@@ -11,7 +11,7 @@
 - **持久化 Chrome Profile** — 位于宿主专用插件数据目录：Codex 使用 `~/.codex/plugins/data/.chrome-profiles/tradingview`，Claude 使用 `~/.claude/plugins/data/.chrome-profiles/tradingview`
 - **跨会话 Cookie 持久化** — 登录 Cookie 自动保存到磁盘，浏览器重启后自动恢复，无需重新登录
 - **插件 Monitor** — Chrome 自动启动、每 10 秒健康检查、崩溃自动重启、端口冲突自动规避
-- **代理支持** — 支持 `HTTPS_PROXY`/`HTTP_PROXY` 环境变量
+- **代理支持** — 插件 `userConfig.proxy` 同时作用于 Chrome 与 HTTP API 流量，并保留 `ALL_PROXY` / `HTTPS_PROXY` / `HTTP_PROXY` 环境变量回退
 - **4 个 Skill** — 通用 TradingView 使用，以及筛选器、期权分析、新闻研究的引导式工作流
 
 ## 前置要求
@@ -151,13 +151,15 @@ tradingview/
 5. **只读设计**：不执行交易、不创建提醒、不修改自选
 6. **uv 项目管理**：快速、可复现的依赖管理
 
-## 环境变量
+## 配置
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `TV_CDP_PORT` | `9333` | Chrome DevTools Protocol 端口 |
-| `HTTPS_PROXY` | (无) | TradingView API 请求的 HTTP 代理 |
-| `HTTP_PROXY` | (无) | HTTP 代理（备选） |
+Claude Code 插件在 `.claude-plugin/plugin.json` 中声明了 `proxy` 用户配置字段。
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `proxy` | 空 | 可选 HTTP/SOCKS 代理，同时作用于 Chrome 流量与 TradingView HTTP API 请求。示例：`http://127.0.0.1:7890`、`socks5://127.0.0.1:7980`。支持 `http://`、`https://`、`socks5://`、`socks4://` |
+
+如果 `proxy` 为空，CLI 会按顺序回退读取环境变量：`ALL_PROXY`、`HTTPS_PROXY`、`HTTP_PROXY`，然后读取对应小写变量。`TV_CDP_PORT` 仍用于控制 Chrome DevTools Protocol 端口，默认值为 `9333`。
 
 ## 许可证
 

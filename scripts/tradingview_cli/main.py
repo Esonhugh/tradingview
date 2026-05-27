@@ -69,14 +69,15 @@ async def run(cmd: str, args: dict) -> dict:
 
     port = int(args.get("port", os.environ.get("TV_CDP_PORT", DEFAULT_CDP_PORT)))
     headless = args.get("headless", "true") != "false"
+    proxy = args.get("proxy")
 
     if cmd == "launch":
-        return await launch_browser(port=port, headless=headless)
+        return await launch_browser(port=port, headless=headless, proxy=proxy)
 
     elif cmd == "login-interactive":
         # Always stop existing instance, then launch visible for login
         stop_browser()
-        result = await launch_browser(port=port, headless=False)
+        result = await launch_browser(port=port, headless=False, proxy=proxy)
         # Navigate to sign-in page via CDP
         try:
             import websockets
@@ -138,7 +139,7 @@ async def run(cmd: str, args: dict) -> dict:
         }
 
     elif cmd == "ensure":
-        return await ensure_running(port=port, headless=headless)
+        return await ensure_running(port=port, headless=headless, proxy=proxy)
 
     elif cmd == "stop":
         return stop_browser()

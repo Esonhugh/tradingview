@@ -19,6 +19,7 @@ import time
 import httpx
 
 from .paths import PROFILE_DIR, STATE_FILE
+from .settings import ProxyConfigError, get_proxy, proxy_env_for_child
 
 DEFAULT_CDP_PORT = int(os.environ.get("TV_CDP_PORT", "9333"))
 TRADINGVIEW_URL = "https://www.tradingview.com/chart/"
@@ -89,7 +90,24 @@ def get_status() -> dict:
     return {"running": False, "port": None, "pid": None}
 
 
-async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) -> dict:
+def build_visible_chrome_args(chrome_bin: str, port: int,
+                              proxy: str | None = None) -> list[str]:
+    """Build visible Chrome launch arguments."""
+    args = [
+        chrome_bin,
+        f"--user-data-dir={PROFILE_DIR}",
+        f"--remote-debugging-port={port}",
+        "--no-first-run",
+        "--no-default-browser-check",
+    ]
+    if proxy:
+        args.append(f"--proxy-server={proxy}")
+    args.append(TRADINGVIEW_URL)
+    return args
+
+
+async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True,
+                         proxy: str | None = None) -> dict:
     """Start the monitor daemon which manages Chrome.
 
     For headless mode: starts the monitor process.
@@ -99,11 +117,17 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
 
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
+    try:
+        resolved_proxy = get_proxy(proxy)
+    except ProxyConfigError as e:
+        return {"error": str(e)}
+
     # Check if already running
     status = get_status()
     if status["running"]:
         return {"status": "already_running", "port": status["port"], "pid": status["pid"],
-                "monitor_pid": status.get("monitor_pid")}
+                "monitor_pid": status.get("monitor_pid"),
+                "proxy_configured": status.get("proxy_configured", False)}
 
     if headless:
         # Start via monitor daemon
@@ -114,6 +138,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
+            env=proxy_env_for_child(resolved_proxy),
         )
 
         # Wait for monitor to become ready
@@ -127,6 +152,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
                     "pid": state.get("chrome_pid"),
                     "monitor_pid": state.get("monitor_pid"),
                     "profile_dir": str(PROFILE_DIR),
+                    "proxy_configured": bool(state.get("proxy_configured", resolved_proxy)),
                 }
             if state and state.get("status") == "error":
                 return {"error": state.get("error", "Monitor failed to start")}
@@ -151,14 +177,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
         if not chrome_bin:
             return {"error": "Chrome/Chromium not found"}
 
-        args = [
-            chrome_bin,
-            f"--user-data-dir={PROFILE_DIR}",
-            f"--remote-debugging-port={port}",
-            "--no-first-run",
-            "--no-default-browser-check",
-            TRADINGVIEW_URL,
-        ]
+        args = build_visible_chrome_args(chrome_bin, port, resolved_proxy)
 
         proc = subprocess.Popen(
             args,
@@ -186,6 +205,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
             "port": port,
             "headless": False,
             "profile_dir": str(PROFILE_DIR),
+            "proxy_configured": bool(resolved_proxy),
             "started_at": time.time(),
         }
         STATE_FILE.write_text(json.dumps(state))
@@ -196,6 +216,7 @@ async def launch_browser(port: int = DEFAULT_CDP_PORT, headless: bool = True) ->
             "pid": proc.pid,
             "profile_dir": str(PROFILE_DIR),
             "headless": False,
+            "proxy_configured": bool(resolved_proxy),
         }
 
 
@@ -257,13 +278,15 @@ def stop_browser() -> dict:
     return {"status": "stopped", "monitor_pid": monitor_pid, "pid": chrome_pid}
 
 
-async def ensure_running(port: int = DEFAULT_CDP_PORT, headless: bool = True) -> dict:
+async def ensure_running(port: int = DEFAULT_CDP_PORT, headless: bool = True,
+                         proxy: str | None = None) -> dict:
     """Ensure browser is running via monitor, launch if not."""
     status = get_status()
     if status["running"]:
         return {"status": "already_running", "port": status["port"], "pid": status["pid"],
-                "monitor_pid": status.get("monitor_pid")}
-    return await launch_browser(port=port, headless=headless)
+                "monitor_pid": status.get("monitor_pid"),
+                "proxy_configured": status.get("proxy_configured", False)}
+    return await launch_browser(port=port, headless=headless, proxy=proxy)
 
 
 async def inject_cookies(cookies: list[dict]) -> dict:

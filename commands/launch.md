@@ -1,6 +1,6 @@
 ---
 description: "Launch TradingView browser with persistent Chrome profile for data access"
-argument-hint: "[--headless=false] [--port=9333]"
+argument-hint: "[--headless=false] [--port=9333] [--proxy=socks5://127.0.0.1:7980]"
 allowed-tools: ["Bash"]
 ---
 
@@ -18,12 +18,13 @@ command -v uv || echo "ERROR: Install uv first: curl -LsSf https://astral.sh/uv/
 ## Usage
 
 ```bash
-cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py launch [--headless=false] [--port=9333]
+cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py launch [--headless=false] [--port=9333] [--proxy=socks5://127.0.0.1:7980]
 ```
 
 Options:
 - `--headless=false`: Show the browser window (useful for first-time login)
 - `--port=9333`: CDP debugging port (default 9333)
+- `--proxy=socks5://127.0.0.1:7980`: Temporary proxy override. Normal plugin use should configure the manifest `userConfig.proxy` field. If neither is set, the CLI falls back to `ALL_PROXY`, `HTTPS_PROXY`, and `HTTP_PROXY`.
 
 ## First-Time Setup
 

@@ -11,7 +11,7 @@ TradingView data access via persistent headless Chrome with automatic lifecycle 
 - **Persistent Chrome profile** in host-specific plugin data — Codex uses `~/.codex/plugins/data/.chrome-profiles/tradingview`, Claude uses `~/.claude/plugins/data/.chrome-profiles/tradingview`
 - **Cross-session cookie persistence** — session cookies are saved to disk and auto-restored when the browser restarts, no re-login needed
 - **Plugin monitor** — Chrome auto-launches, health-checks every 10s, auto-restarts on crash, port conflict resolution
-- **Proxy support** — respects `HTTPS_PROXY`/`HTTP_PROXY` environment variables
+- **Proxy support** — plugin `userConfig.proxy` applies to both Chrome and HTTP API traffic, with `ALL_PROXY`/`HTTPS_PROXY`/`HTTP_PROXY` fallback
 - **4 skills** for general TradingView usage plus guided screener, options, and news workflows
 
 ## Prerequisites
@@ -151,13 +151,15 @@ tradingview/
 5. **Read-only by design**: No trade execution, alert creation, or watchlist modification
 6. **uv project**: Fast, reproducible dependency management
 
-## Environment Variables
+## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TV_CDP_PORT` | `9333` | Chrome DevTools Protocol port |
-| `HTTPS_PROXY` | (none) | HTTP proxy for TradingView API requests |
-| `HTTP_PROXY` | (none) | HTTP proxy (fallback) |
+The Claude Code plugin declares a `proxy` user configuration field in `.claude-plugin/plugin.json`.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `proxy` | empty | Optional HTTP/SOCKS proxy for both Chrome traffic and TradingView HTTP API requests. Examples: `http://127.0.0.1:7890`, `socks5://127.0.0.1:7980` |
+
+If `proxy` is empty, the CLI falls back to environment variables in this order: `ALL_PROXY`, `HTTPS_PROXY`, `HTTP_PROXY`, then lowercase variants. `TV_CDP_PORT` still controls the Chrome DevTools Protocol port and defaults to `9333`.
 
 ## License
 

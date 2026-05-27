@@ -5,5 +5,14 @@
   "author": {
     "name": "esonhugh"
   },
-  "monitors": "./monitors/monitors.json"
+  "monitors": "./monitors/monitors.json",
+  "userConfig": {
+    "proxy": {
+      "type": "string",
+      "title": "Proxy URL (optional)",
+      "description": "HTTP or SOCKS5 proxy for TradingView Chrome and HTTP API requests, e.g. socks5://127.0.0.1:7980. Leave empty to auto-detect from ALL_PROXY / HTTPS_PROXY / HTTP_PROXY environment variables.",
+      "default": "",
+      "required": false
+    }
+  }
 }

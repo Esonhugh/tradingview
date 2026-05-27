@@ -7,7 +7,6 @@ and provides authenticated fetch wrappers for all TradingView APIs.
 """
 
 import json
-import os
 import time
 
 import httpx
@@ -15,6 +14,7 @@ import websockets
 
 from .browser import get_ws_endpoint, inject_cookies
 from .paths import COOKIE_CACHE_FILE
+from .settings import ProxyConfigError, get_proxy
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -120,6 +120,11 @@ def reset_cookie_cache():
     _cookie_cache = None
 
 
+def get_http_proxy() -> str | None:
+    """Return validated proxy for TradingView HTTP requests."""
+    return get_proxy()
+
+
 async def tv_fetch(url: str, method: str = "GET", json_body: dict | None = None,
                    headers: dict | None = None) -> dict:
     """Make authenticated HTTP request to TradingView APIs."""
@@ -139,7 +144,10 @@ async def tv_fetch(url: str, method: str = "GET", json_body: dict | None = None,
     if headers:
         default_headers.update(headers)
 
-    proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("http_proxy") or os.environ.get("https_proxy")
+    try:
+        proxy = get_http_proxy()
+    except ProxyConfigError as e:
+        return {"_error": "invalid_proxy", "_message": str(e)}
 
     async with httpx.AsyncClient(timeout=30.0, proxy=proxy) as client:
         if method.upper() == "POST":
@@ -163,6 +171,11 @@ async def programmatic_login(email: str, password: str) -> dict:
     the session cookies (sessionid, device_t, etc.) from the response.
     """
     try:
+        try:
+            proxy = get_http_proxy()
+        except ProxyConfigError as e:
+            return {"error": str(e)}
+
         async with httpx.AsyncClient(
             follow_redirects=True,
             headers={
@@ -171,6 +184,7 @@ async def programmatic_login(email: str, password: str) -> dict:
                 "Referer": "https://www.tradingview.com/",
             },
             timeout=30.0,
+            proxy=proxy,
         ) as client:
             resp = await client.post(
                 "https://www.tradingview.com/accounts/signin/",

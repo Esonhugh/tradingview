@@ -18,6 +18,7 @@ import sys
 import time
 
 from .paths import PROFILE_DIR, STATE_FILE
+from .settings import ProxyConfigError, get_proxy
 
 DEFAULT_CDP_PORT = int(os.environ.get("TV_CDP_PORT", "9333"))
 TRADINGVIEW_URL = "https://www.tradingview.com/chart/"
@@ -83,12 +84,9 @@ def write_state(state: dict):
     tmp.replace(STATE_FILE)
 
 
-def launch_chrome(port: int, headless: bool = True) -> subprocess.Popen | None:
-    """Launch Chrome subprocess, return Popen object."""
-    chrome_bin = find_chrome_binary()
-    if not chrome_bin:
-        return None
-
+def build_chrome_args(chrome_bin: str, port: int, headless: bool = True,
+                      proxy: str | None = None) -> list[str]:
+    """Build Chrome launch arguments."""
     args = [
         chrome_bin,
         f"--user-data-dir={PROFILE_DIR}",
@@ -99,10 +97,22 @@ def launch_chrome(port: int, headless: bool = True) -> subprocess.Popen | None:
         "--disable-backgrounding-occluded-windows",
         "--disable-renderer-backgrounding",
     ]
+    if proxy:
+        args.append(f"--proxy-server={proxy}")
     if headless:
         args.append("--headless=new")
     args.append(TRADINGVIEW_URL)
+    return args
 
+
+def launch_chrome(port: int, headless: bool = True,
+                  proxy: str | None = None) -> subprocess.Popen | None:
+    """Launch Chrome subprocess, return Popen object."""
+    chrome_bin = find_chrome_binary()
+    if not chrome_bin:
+        return None
+
+    args = build_chrome_args(chrome_bin, port, headless=headless, proxy=proxy)
     proc = subprocess.Popen(
         args,
         stdout=subprocess.DEVNULL,
@@ -125,6 +135,13 @@ def run_monitor(port: int | None = None, headless: bool = True):
     """Main monitor loop — outputs status to stdout for Claude."""
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
+    try:
+        proxy = get_proxy()
+    except ProxyConfigError as e:
+        log(f"[tradingview-monitor] ERROR: {e}")
+        write_state({"status": "error", "error": str(e), "monitor_pid": os.getpid()})
+        return
+
     # Resolve port
     if port is None:
         port = int(os.environ.get("TV_CDP_PORT", DEFAULT_CDP_PORT))
@@ -139,12 +156,13 @@ def run_monitor(port: int | None = None, headless: bool = True):
             "port": port,
             "headless": headless,
             "profile_dir": str(PROFILE_DIR),
+            "proxy_configured": bool(proxy),
             "started_at": time.time(),
             "last_health": time.time(),
             "adopted": True,
         })
         # Enter health-check loop for adopted process
-        _health_loop(port, headless, chrome_proc=None)
+        _health_loop(port, headless, chrome_proc=None, proxy=proxy)
         return
 
     # Find available port
@@ -159,7 +177,7 @@ def run_monitor(port: int | None = None, headless: bool = True):
             return
 
     # Initial launch
-    chrome_proc = launch_chrome(port, headless=headless)
+    chrome_proc = launch_chrome(port, headless=headless, proxy=proxy)
     if chrome_proc is None:
         log("[tradingview-monitor] ERROR: Chrome/Chromium not found")
         write_state({"status": "error", "error": "Chrome not found", "monitor_pid": os.getpid()})
@@ -180,14 +198,16 @@ def run_monitor(port: int | None = None, headless: bool = True):
         "port": port,
         "headless": headless,
         "profile_dir": str(PROFILE_DIR),
+        "proxy_configured": bool(proxy),
         "started_at": time.time(),
         "last_health": time.time(),
     })
 
-    _health_loop(port, headless, chrome_proc)
+    _health_loop(port, headless, chrome_proc, proxy=proxy)
 
 
-def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None):
+def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None,
+                 proxy: str | None = None):
     """Health-check loop with auto-restart."""
     shutdown_requested = False
     restart_count = 0
@@ -215,6 +235,7 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
                 "port": port,
                 "headless": headless,
                 "profile_dir": str(PROFILE_DIR),
+                "proxy_configured": bool(proxy),
                 "started_at": time.time(),
                 "last_health": time.time(),
             })
@@ -245,7 +266,7 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
             if not is_port_available(port):
                 time.sleep(3)
 
-            chrome_proc = launch_chrome(port, headless=headless)
+            chrome_proc = launch_chrome(port, headless=headless, proxy=proxy)
             if chrome_proc and wait_for_cdp(port):
                 log(f"[tradingview-monitor] Chrome restarted — PID {chrome_proc.pid}")
                 write_state({

@@ -18,6 +18,8 @@ Login to TradingView using email and password without opening a visible browser.
 cd "${PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/scripts" && uv run ./tradingview.py login-email --email=user@example.com --password=secret
 ```
 
+Proxy behavior: email login uses the same proxy as other TradingView HTTP API calls. Configure the plugin `userConfig.proxy` field for normal use, or use `ALL_PROXY` / `HTTPS_PROXY` / `HTTP_PROXY` as fallback.
+
 ## How It Works
 
 1. POSTs email + password to TradingView's `/accounts/signin/` endpoint

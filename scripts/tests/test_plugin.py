@@ -22,6 +22,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 # Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -74,6 +76,25 @@ def test_monitor_find_chrome_binary():
     if result:
         assert os.path.isfile(result)
     print(f"  PASS  test_monitor_find_chrome_binary (found: {result is not None})")
+
+
+def test_monitor_build_chrome_args_with_proxy():
+    """Monitor Chrome args include proxy-server only when proxy is configured."""
+    from tradingview_cli.monitor import build_chrome_args
+
+    no_proxy = build_chrome_args("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", 9333, True, None)
+    assert "--proxy-server=http://127.0.0.1:7890" not in no_proxy
+    assert "--headless=new" in no_proxy
+
+    with_proxy = build_chrome_args(
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        9333,
+        True,
+        "http://127.0.0.1:7890",
+    )
+    assert "--proxy-server=http://127.0.0.1:7890" in with_proxy
+    assert with_proxy[-1] == "https://www.tradingview.com/chart/"
+    print("  PASS  test_monitor_build_chrome_args_with_proxy")
 
 
 def test_monitor_cdp_health():
@@ -137,6 +158,27 @@ def test_browser_constants():
     assert "/.claude/plugins/data/.chrome-profiles/tradingview" in str(PROFILE_DIR)
     assert STATE_FILE.name == ".monitor.json"
     print("  PASS  test_browser_constants")
+
+
+def test_browser_build_visible_chrome_args_with_proxy():
+    """Visible Chrome args include proxy-server only when proxy is configured."""
+    from tradingview_cli.browser import build_visible_chrome_args
+
+    args = build_visible_chrome_args(
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        9333,
+        None,
+    )
+    assert "--proxy-server=http://127.0.0.1:7890" not in args
+
+    args = build_visible_chrome_args(
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        9333,
+        "socks5://127.0.0.1:7980",
+    )
+    assert "--proxy-server=socks5://127.0.0.1:7980" in args
+    assert args[-1] == "https://www.tradingview.com/chart/"
+    print("  PASS  test_browser_build_visible_chrome_args_with_proxy")
 
 
 def test_codex_path_detection():
@@ -228,6 +270,114 @@ def test_cli_parse_args():
     print("  PASS  test_cli_parse_args")
 
 
+def test_cli_parse_proxy_arg():
+    """CLI parser accepts temporary --proxy overrides."""
+    from tradingview_cli.main import parse_args
+
+    cmd, args = parse_args(["launch", "--proxy=socks5://127.0.0.1:7980"])
+    assert cmd == "launch"
+    assert args["proxy"] == "socks5://127.0.0.1:7980"
+    print("  PASS  test_cli_parse_proxy_arg")
+
+
+def test_settings_resolve_proxy_priority():
+    """Proxy lookup prefers CLI override, then plugin userConfig, then env fallback."""
+    from tradingview_cli.settings import resolve_proxy
+
+    env = {
+        "CLAUDE_PLUGIN_OPTION_PROXY": "http://plugin-proxy:8080",
+        "ALL_PROXY": "socks5://env-proxy:1080",
+        "HTTPS_PROXY": "http://https-proxy:8080",
+        "HTTP_PROXY": "http://http-proxy:8080",
+    }
+    assert resolve_proxy("http://cli-proxy:8888", env=env) == "http://cli-proxy:8888"
+    assert resolve_proxy(None, env=env) == "http://plugin-proxy:8080"
+
+    env.pop("CLAUDE_PLUGIN_OPTION_PROXY")
+    assert resolve_proxy(None, env=env) == "socks5://env-proxy:1080"
+
+    env.pop("ALL_PROXY")
+    assert resolve_proxy(None, env=env) == "http://https-proxy:8080"
+
+    env.pop("HTTPS_PROXY")
+    assert resolve_proxy(None, env=env) == "http://http-proxy:8080"
+    print("  PASS  test_settings_resolve_proxy_priority")
+
+
+def test_settings_resolve_proxy_empty_values_are_unset():
+    """Empty proxy values are ignored."""
+    from tradingview_cli.settings import resolve_proxy
+
+    env = {
+        "CLAUDE_PLUGIN_OPTION_PROXY": "",
+        "ALL_PROXY": "   ",
+        "HTTPS_PROXY": "http://https-proxy:8080",
+    }
+    assert resolve_proxy("", env=env) == "http://https-proxy:8080"
+    assert resolve_proxy("   ", env={}) is None
+    print("  PASS  test_settings_resolve_proxy_empty_values_are_unset")
+
+
+def test_settings_validate_proxy_scheme():
+    """Proxy validation accepts supported schemes and rejects unsupported schemes."""
+    from tradingview_cli.settings import ProxyConfigError, validate_proxy
+
+    assert validate_proxy(None) is None
+    assert validate_proxy("http://127.0.0.1:7890") == "http://127.0.0.1:7890"
+    assert validate_proxy("https://proxy.example:443") == "https://proxy.example:443"
+    assert validate_proxy("socks5://127.0.0.1:1080") == "socks5://127.0.0.1:1080"
+    assert validate_proxy("socks4://127.0.0.1:1080") == "socks4://127.0.0.1:1080"
+
+    with pytest.raises(ProxyConfigError, match="Unsupported proxy scheme"):
+        validate_proxy("ftp://127.0.0.1:21")
+    print("  PASS  test_settings_validate_proxy_scheme")
+
+
+def test_settings_proxy_env_for_child():
+    """Child monitor env receives the resolved proxy through plugin option env."""
+    from tradingview_cli.settings import proxy_env_for_child
+
+    child = proxy_env_for_child("http://127.0.0.1:7890", base_env={"PATH": "/bin"})
+    assert child["PATH"] == "/bin"
+    assert child["CLAUDE_PLUGIN_OPTION_PROXY"] == "http://127.0.0.1:7890"
+    assert child["ALL_PROXY"] == "http://127.0.0.1:7890"
+    assert child["HTTPS_PROXY"] == "http://127.0.0.1:7890"
+    assert child["HTTP_PROXY"] == "http://127.0.0.1:7890"
+    print("  PASS  test_settings_proxy_env_for_child")
+
+
+def test_client_resolves_proxy_for_http():
+    """HTTP client proxy resolution uses the unified settings module."""
+    from tradingview_cli import client
+
+    tracked = [
+        "CLAUDE_PLUGIN_OPTION_PROXY",
+        "ALL_PROXY",
+        "HTTPS_PROXY",
+        "HTTP_PROXY",
+        "all_proxy",
+        "https_proxy",
+        "http_proxy",
+    ]
+    saved = {key: os.environ.get(key) for key in tracked}
+    try:
+        for key in tracked:
+            os.environ.pop(key, None)
+        os.environ["CLAUDE_PLUGIN_OPTION_PROXY"] = "http://plugin-proxy:8080"
+        assert client.get_http_proxy() == "http://plugin-proxy:8080"
+
+        os.environ.pop("CLAUDE_PLUGIN_OPTION_PROXY")
+        os.environ["ALL_PROXY"] = "socks5://env-proxy:1080"
+        assert client.get_http_proxy() == "socks5://env-proxy:1080"
+    finally:
+        for key in tracked:
+            if saved[key] is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = saved[key]
+    print("  PASS  test_client_resolves_proxy_for_http")
+
+
 def test_cli_help_command():
     """help command returns list of all commands."""
     result = asyncio.run(_run_cmd("help", {}))
@@ -315,8 +465,6 @@ def test_plugin_structure():
     # Must exist
     must_exist = [
         ".claude-plugin/plugin.json",
-        ".codex-plugin/plugin.json",
-        ".agents/plugins/marketplace.json",
         "hooks/hooks.json",
         "hooks/session_start.sh",
         "monitors/monitors.json",
@@ -377,33 +525,18 @@ def test_plugin_json_valid():
     print("  PASS  test_plugin_json_valid")
 
 
-def test_codex_plugin_json_valid():
-    """Codex plugin.json has correct content."""
+def test_plugin_json_proxy_user_config():
+    """Claude plugin manifest declares optional proxy userConfig."""
     plugin_root = Path(__file__).parent.parent.parent
-    pj = json.loads((plugin_root / ".codex-plugin/plugin.json").read_text())
-    assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.4.0"
-    assert pj["skills"] == "./skills/"
-    assert pj["hooks"] == "./hooks/hooks.json"
-    assert pj["interface"]["displayName"] == "TradingView"
-    assert pj["interface"]["category"] == "Finance"
-    assert "Read" in pj["interface"]["capabilities"]
-    print("  PASS  test_codex_plugin_json_valid")
-
-
-def test_codex_marketplace_json_valid():
-    """Codex marketplace entry has required policy and category."""
-    plugin_root = Path(__file__).parent.parent.parent
-    marketplace = json.loads((plugin_root / ".agents/plugins/marketplace.json").read_text())
-    assert marketplace["name"] == "esonhugh-tradingview"
-    assert marketplace["interface"]["displayName"] == "Esonhugh TradingView"
-    entry = marketplace["plugins"][0]
-    assert entry["name"] == "tradingview"
-    assert entry["source"] == {"source": "local", "path": "./"}
-    assert entry["policy"]["installation"] == "AVAILABLE"
-    assert entry["policy"]["authentication"] == "ON_INSTALL"
-    assert entry["category"] == "Finance"
-    print("  PASS  test_codex_marketplace_json_valid")
+    pj = json.loads((plugin_root / ".claude-plugin/plugin.json").read_text())
+    proxy = pj["userConfig"]["proxy"]
+    assert proxy["type"] == "string"
+    assert proxy["title"] == "Proxy URL (optional)"
+    assert "Chrome and HTTP API" in proxy["description"]
+    assert "ALL_PROXY" in proxy["description"]
+    assert proxy["default"] == ""
+    assert proxy["required"] is False
+    print("  PASS  test_plugin_json_proxy_user_config")
 
 
 def test_codex_hooks_json_valid():
@@ -462,14 +595,22 @@ def run_all_tests():
         test_monitor_port_check,
         test_monitor_find_available_port,
         test_monitor_find_chrome_binary,
+        test_monitor_build_chrome_args_with_proxy,
         test_monitor_cdp_health,
         test_monitor_write_state,
         test_browser_get_status,
         test_browser_constants,
+        test_browser_build_visible_chrome_args_with_proxy,
         test_codex_path_detection,
         test_browser_read_state,
         test_browser_monitor_alive,
         test_cli_parse_args,
+        test_cli_parse_proxy_arg,
+        test_settings_resolve_proxy_priority,
+        test_settings_resolve_proxy_empty_values_are_unset,
+        test_settings_validate_proxy_scheme,
+        test_settings_proxy_env_for_child,
+        test_client_resolves_proxy_for_http,
         test_cli_help_command,
         test_cli_status_command,
         test_cli_missing_args,
@@ -477,8 +618,7 @@ def run_all_tests():
         test_monitor_argparse,
         test_plugin_structure,
         test_plugin_json_valid,
-        test_codex_plugin_json_valid,
-        test_codex_marketplace_json_valid,
+        test_plugin_json_proxy_user_config,
         test_codex_hooks_json_valid,
         test_monitors_json_valid,
         test_no_stale_path_references,
