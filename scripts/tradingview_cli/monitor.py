@@ -16,6 +16,8 @@ import subprocess
 import shutil
 import sys
 import time
+import urllib.parse
+import urllib.request
 
 from .paths import PROFILE_DIR, STATE_FILE
 from .settings import ProxyConfigError, get_proxy
@@ -67,13 +69,52 @@ def find_available_port(start: int = DEFAULT_CDP_PORT, max_tries: int = 10) -> i
 
 def check_cdp_health(port: int) -> bool:
     """Quick synchronous CDP health check via HTTP."""
-    import urllib.request
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{port}/json/version", method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             return resp.status == 200
     except Exception:
         return False
+
+
+def _read_cdp_pages(port: int) -> list[dict]:
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/json", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            pages = json.loads(resp.read().decode())
+        return pages if isinstance(pages, list) else []
+    except Exception:
+        return []
+
+
+def check_tradingview_target(port: int) -> bool:
+    """Return whether a TradingView page target exists in CDP."""
+    return any(
+        page.get("type") == "page" and "tradingview.com" in page.get("url", "")
+        for page in _read_cdp_pages(port)
+    )
+
+
+def ensure_tradingview_target(port: int, timeout: float = 10.0) -> bool:
+    """Create a TradingView chart target when Chrome is alive but no page exists."""
+    if check_tradingview_target(port):
+        return True
+
+    encoded_url = urllib.parse.quote(TRADINGVIEW_URL, safe="")
+    try:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/json/new?{encoded_url}", method="PUT")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status not in (200, 201):
+                return False
+    except Exception:
+        return False
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if check_tradingview_target(port):
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def write_state(state: dict):
@@ -148,7 +189,10 @@ def run_monitor(port: int | None = None, headless: bool = True):
 
     # Check if CDP is already reachable (e.g. from a prior session)
     if check_cdp_health(port):
+        target_ready = ensure_tradingview_target(port)
         log(f"[tradingview-monitor] Browser already running on port {port}")
+        if not target_ready:
+            log("[tradingview-monitor] WARNING: TradingView page target is missing")
         write_state({
             "status": "running",
             "monitor_pid": os.getpid(),
@@ -159,6 +203,7 @@ def run_monitor(port: int | None = None, headless: bool = True):
             "proxy_configured": bool(proxy),
             "started_at": time.time(),
             "last_health": time.time(),
+            "tradingview_target": target_ready,
             "adopted": True,
         })
         # Enter health-check loop for adopted process
@@ -190,7 +235,10 @@ def run_monitor(port: int | None = None, headless: bool = True):
         chrome_proc.terminate()
         return
 
+    target_ready = ensure_tradingview_target(port)
     log(f"[tradingview-monitor] Chrome launched — CDP on port {port}, PID {chrome_proc.pid}")
+    if not target_ready:
+        log("[tradingview-monitor] WARNING: TradingView page target is missing")
     write_state({
         "status": "running",
         "monitor_pid": os.getpid(),
@@ -201,6 +249,7 @@ def run_monitor(port: int | None = None, headless: bool = True):
         "proxy_configured": bool(proxy),
         "started_at": time.time(),
         "last_health": time.time(),
+        "tradingview_target": target_ready,
     })
 
     _health_loop(port, headless, chrome_proc, proxy=proxy)
@@ -225,8 +274,12 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
             break
 
         healthy = check_cdp_health(port)
+        target_ready = False
 
         if healthy:
+            target_ready = ensure_tradingview_target(port)
+            if not target_ready:
+                log("[tradingview-monitor] WARNING: TradingView page target is missing")
             restart_count = 0
             write_state({
                 "status": "running",
@@ -238,6 +291,7 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
                 "proxy_configured": bool(proxy),
                 "started_at": time.time(),
                 "last_health": time.time(),
+                "tradingview_target": target_ready,
             })
         else:
             # Chrome died — attempt restart
@@ -268,7 +322,10 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
 
             chrome_proc = launch_chrome(port, headless=headless, proxy=proxy)
             if chrome_proc and wait_for_cdp(port):
+                target_ready = ensure_tradingview_target(port)
                 log(f"[tradingview-monitor] Chrome restarted — PID {chrome_proc.pid}")
+                if not target_ready:
+                    log("[tradingview-monitor] WARNING: TradingView page target is missing")
                 write_state({
                     "status": "running",
                     "monitor_pid": os.getpid(),
@@ -278,6 +335,7 @@ def _health_loop(port: int, headless: bool, chrome_proc: subprocess.Popen | None
                     "profile_dir": str(PROFILE_DIR),
                     "started_at": time.time(),
                     "last_health": time.time(),
+                    "tradingview_target": target_ready,
                     "restart_count": restart_count,
                 })
 

@@ -7,6 +7,7 @@ import json
 import re
 from datetime import date, datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
@@ -366,6 +367,38 @@ RESOLUTION_MAP = {
     "m": "M", "1M": "M", "M": "M",
 }
 
+TRADINGVIEW_CHART_URL = "https://www.tradingview.com/chart/"
+
+
+def _find_tradingview_pages(pages: list[dict]) -> list[dict]:
+    return [p for p in pages if "tradingview.com" in p.get("url", "") and p.get("type") == "page"]
+
+
+def _select_tradingview_page(tv_pages: list[dict]) -> dict:
+    chart_pages = [p for p in tv_pages if "/chart/" in p.get("url", "")]
+    return chart_pages[0] if chart_pages else tv_pages[0]
+
+
+async def _ensure_tradingview_pages(client: httpx.AsyncClient, port: int, wait_attempts: int = 20) -> list[dict]:
+    import asyncio
+
+    resp = await client.get(f"http://127.0.0.1:{port}/json")
+    tv_pages = _find_tradingview_pages(resp.json())
+    if tv_pages:
+        return tv_pages
+
+    encoded_url = quote(TRADINGVIEW_CHART_URL, safe="")
+    await client.put(f"http://127.0.0.1:{port}/json/new?{encoded_url}")
+
+    for _ in range(wait_attempts):
+        await asyncio.sleep(0.5)
+        resp = await client.get(f"http://127.0.0.1:{port}/json")
+        tv_pages = _find_tradingview_pages(resp.json())
+        if tv_pages:
+            return tv_pages
+
+    return []
+
 
 async def cmd_kline(ticker: str, exchange: str = "NASDAQ",
                     resolution: str = "D", bars: int = 100,
@@ -385,15 +418,11 @@ async def cmd_kline(ticker: str, exchange: str = "NASDAQ",
     bars = max(1, min(5000, bars))
 
     async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(f"http://127.0.0.1:{port}/json")
-        pages = resp.json()
-
-    tv_pages = [p for p in pages if "tradingview.com" in p.get("url", "") and p.get("type") == "page"]
+        tv_pages = await _ensure_tradingview_pages(client, port)
     if not tv_pages:
-        return {"error": "No TradingView page open in browser"}
+        return {"error": "No TradingView page open in browser and auto-create failed"}
 
-    chart_pages = [p for p in tv_pages if "/chart/" in p.get("url", "")]
-    target = chart_pages[0] if chart_pages else tv_pages[0]
+    target = _select_tradingview_page(tv_pages)
     ws_url = target["webSocketDebuggerUrl"]
 
     async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:
@@ -548,19 +577,15 @@ async def cmd_chart_state(tab_id: str | None = None) -> dict:
     port = status["port"]
 
     async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(f"http://127.0.0.1:{port}/json")
-        pages = resp.json()
-
-    tv_pages = [p for p in pages if "tradingview.com" in p.get("url", "") and p.get("type") == "page"]
+        tv_pages = await _ensure_tradingview_pages(client, port)
     if not tv_pages:
-        return {"error": "No TradingView page open in browser"}
+        return {"error": "No TradingView page open in browser and auto-create failed"}
 
     target = None
     if tab_id:
         target = next((p for p in tv_pages if p["id"] == tab_id), None)
     if not target:
-        chart_pages = [p for p in tv_pages if "/chart/" in p.get("url", "")]
-        target = chart_pages[0] if chart_pages else tv_pages[0]
+        target = _select_tradingview_page(tv_pages)
 
     ws_url = target["webSocketDebuggerUrl"]
     async with websockets.connect(ws_url, max_size=5 * 1024 * 1024) as ws:
@@ -620,19 +645,15 @@ async def cmd_screenshot(tab_id: str | None = None, output: str | None = None) -
     port = status["port"]
 
     async with httpx.AsyncClient(timeout=5.0) as client:
-        resp = await client.get(f"http://127.0.0.1:{port}/json")
-        pages = resp.json()
-
-    tv_pages = [p for p in pages if "tradingview.com" in p.get("url", "") and p.get("type") == "page"]
+        tv_pages = await _ensure_tradingview_pages(client, port)
     if not tv_pages:
-        return {"error": "No TradingView page open in browser"}
+        return {"error": "No TradingView page open in browser and auto-create failed"}
 
     target = None
     if tab_id:
         target = next((p for p in tv_pages if p["id"] == tab_id), None)
     if not target:
-        chart_pages = [p for p in tv_pages if "/chart/" in p.get("url", "")]
-        target = chart_pages[0] if chart_pages else tv_pages[0]
+        target = _select_tradingview_page(tv_pages)
 
     ws_url = target["webSocketDebuggerUrl"]
     async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:

@@ -15,6 +15,7 @@ Run: uv run python -m pytest tests/ -v
 
 import asyncio
 import importlib
+import io
 import json
 import os
 import sys
@@ -106,6 +107,53 @@ def test_monitor_cdp_health():
     result = check_cdp_health(9333)
     assert isinstance(result, bool)
     print(f"  PASS  test_monitor_cdp_health (port 9333 healthy: {result})")
+
+
+def test_monitor_ensure_tradingview_target_creates_page():
+    """ensure_tradingview_target opens a chart page when CDP has no TradingView target."""
+    from tradingview_cli.monitor import ensure_tradingview_target
+
+    responses = iter([
+        (200, b"[]"),
+        (200, b'{"id":"new-page"}'),
+        (200, b'[{"type":"page","url":"https://www.tradingview.com/chart/"}]'),
+    ])
+    methods = []
+
+    class MockResponse(io.BytesIO):
+        def __init__(self, status, body):
+            super().__init__(body)
+            self.status = status
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(req, timeout=0):
+        methods.append(req.get_method())
+        status, body = next(responses)
+        return MockResponse(status, body)
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        assert ensure_tradingview_target(9333, timeout=0.1) is True
+
+    assert methods == ["GET", "PUT", "GET"]
+    print("  PASS  test_monitor_ensure_tradingview_target_creates_page")
+
+
+def test_commands_selects_chart_page_first():
+    """TradingView page selection prefers chart tabs over other TradingView pages."""
+    from tradingview_cli.commands import _select_tradingview_page
+
+    pages = [
+        {"id": "home", "type": "page", "url": "https://www.tradingview.com/markets/"},
+        {"id": "chart", "type": "page", "url": "https://www.tradingview.com/chart/"},
+    ]
+
+    assert _select_tradingview_page(pages)["id"] == "chart"
+    print("  PASS  test_commands_selects_chart_page_first")
 
 
 def test_monitor_write_state():
@@ -520,7 +568,7 @@ def test_plugin_json_valid():
     plugin_root = Path(__file__).parent.parent.parent
     pj = json.loads((plugin_root / ".claude-plugin/plugin.json").read_text())
     assert pj["name"] == "tradingview"
-    assert pj["version"] == "0.4.1"
+    assert pj["version"] == "0.4.2"
     assert pj["monitors"] == "./monitors/monitors.json"
     print("  PASS  test_plugin_json_valid")
 
@@ -597,6 +645,8 @@ def run_all_tests():
         test_monitor_find_chrome_binary,
         test_monitor_build_chrome_args_with_proxy,
         test_monitor_cdp_health,
+        test_monitor_ensure_tradingview_target_creates_page,
+        test_commands_selects_chart_page_first,
         test_monitor_write_state,
         test_browser_get_status,
         test_browser_constants,
